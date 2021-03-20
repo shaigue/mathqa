@@ -10,6 +10,11 @@ def train_mathqa():
     try:
         import torch
         print("import torch SUCCESS")
+        if torch.cuda.is_available():
+            print("having gpu!!!")
+        else:
+            print("not having gpu")
+            
     except:
         print("import torch FAIL")
     print("FINISHED")

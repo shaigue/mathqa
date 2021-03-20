@@ -26,7 +26,7 @@
 # Parameters for sbatch
 #
 NUM_NODES=1
-NUM_CORES=2
+NUM_CORES=1
 NUM_GPUS=1
 JOB_NAME="mathqa"
 MAIL_USER="shaigue@gmail.com"
@@ -45,7 +45,7 @@ sbatch \
 	--job-name $JOB_NAME \
 	--mail-user $MAIL_USER \
 	--mail-type $MAIL_TYPE \
-	-o 'slurm-%N-%j.out' \
+	-o 'slurm.out' \
 <<EOF
 #!/bin/bash
 echo "*** SLURM BATCH JOB '$JOB_NAME' STARTING ***"
