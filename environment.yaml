@@ -1,0 +1,9 @@
+name: mathqa-torch
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+dependencies:
+  - cudatoolkit
+  - pytorch
+  - torchtext
