@@ -24,8 +24,11 @@ yes yes | bash Miniconda3-latest-Linux-x86_64.sh
 # TODO: figure out how to start anaconda now/ restart the shell
 
 # enter the repo and install the environment
+# TODO: install the environment using srun to catch the cpu
 cd mathqa
-conda env create -f environment.yaml
+# TODO: installing with env did not work with pytorch, need to install with gpu suppurt
+conda env create -n mathqa -c conda-forge -c pytorch
 conda activate mathqa-torch
 
-
+export PATH="/usr/local/cuda/bin:$PATH"
+export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
