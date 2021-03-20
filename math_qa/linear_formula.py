@@ -87,7 +87,10 @@ class LinearFormula:
         t = None
         temps = []
         for op in self.ops:
-            t = op.eval(numbers_from_text, temps)
+            try:
+                t = op.eval(numbers_from_text, temps)
+            except:
+                raise BadProgram
             temps.append(t)
         return t
 
