@@ -95,6 +95,7 @@ def train(model: Seq2Seq, mathqa_manager: MathQAManager, n_epochs: int = 10, eva
 
     best_dev_correctness_rate = 0
     logs = defaultdict(list)
+    print(f"starting training...")
     for epoch_index in range(n_epochs):
         epoch_loss = train_epoch(model, optimizer, mathqa_manager, device)
         print(f"epoch={epoch_index}, loss={epoch_loss}")

@@ -20,18 +20,12 @@ if [ $? != 0 ]; then
 fi
 echo "good sha256sum"
 yes yes | bash Miniconda3-latest-Linux-x86_64.sh
-
-# TODO: figure out how to start anaconda now/ restart the shell
-
+# activate conde
+source "$HOME/miniconda3/etc/profile.d/conda.sh"
 # enter the repo and install the environment
-# TODO: install the environment using srun to catch the cpu
+# TODO: installing with env did not work with pytorch, need to install with gpu support
 cd mathqa
-# TODO: installing with env did not work with pytorch, need to install with gpu suppurt
-conda env create -n mathqa python=3.9
+conda create -n mathqa python=3.9
 conda activate mathqa
-conda install pytorch cudatoolkit=11 -c pytorch -c conda-forge
-
-conda activate mathqa-torch
-
-export PATH="/usr/local/cuda/bin:$PATH"
-export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+# install the dependencies
+conda install pytorch cudatoolkit=11 -c pytorch -c conda-forge -y
