@@ -27,7 +27,10 @@ yes yes | bash Miniconda3-latest-Linux-x86_64.sh
 # TODO: install the environment using srun to catch the cpu
 cd mathqa
 # TODO: installing with env did not work with pytorch, need to install with gpu suppurt
-conda env create -n mathqa -c conda-forge -c pytorch
+conda env create -n mathqa python=3.9
+conda activate mathqa
+conda install pytorch cudatoolkit=11 -c pytorch -c conda-forge
+
 conda activate mathqa-torch
 
 export PATH="/usr/local/cuda/bin:$PATH"

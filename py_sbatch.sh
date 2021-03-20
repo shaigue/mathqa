@@ -36,7 +36,7 @@ MAIL_TYPE=ALL # Valid values are NONE, BEGIN, END, FAIL, REQUEUE, ALL
 # Conda parameters
 #
 CONDA_HOME=$HOME/miniconda3
-CONDA_ENV=mathqa-torch
+CONDA_ENV=mathqa
 
 sbatch \
 	-N $NUM_NODES \
