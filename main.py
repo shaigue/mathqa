@@ -14,11 +14,10 @@ def train_mathqa():
             print("having gpu!!!")
         else:
             print("not having gpu")
-            
+
     except:
         print("import torch FAIL")
     print("FINISHED")
-    # import config
     # manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=config.MAX_VOCABULARY_SIZE, dummy=False)
     # model = Seq2Seq(
     #     source_vocabulary_size=manager.text_vocabulary_size,
