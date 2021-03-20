@@ -68,10 +68,14 @@ class TextVectorizer:
         return [self.token_to_index[token] for token in s]
 
     def token_index_list_to_token_list(self, index_list: List[int]) -> List[str]:
+        if len(index_list) == 0:
+            return []
         token_list = [self.index_to_token[token_index] for token_index in index_list]
         # remove <sos>, <eos> if in the start or end
         if token_list[0] == self.start_of_sequence_token:
             del token_list[0]
+        if len(index_list) == 0:
+            return []
         if token_list[-1] == self.end_of_sequence_token:
             del token_list[-1]
         return token_list

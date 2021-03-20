@@ -120,6 +120,8 @@ class MathQAManager:
         :return: a linear formula string
         """
         text_vector = self.code_vectorizer.token_index_list_to_token_list(token_vector)
+        if len(text_vector) == 0:
+            raise BadProgram
         # first gather all the (op, arguments) pairs
         operation_argument_list = []
         last_operation = None
@@ -158,8 +160,9 @@ class MathQAManager:
                     num = int(arg[1:])
                     if num >= i:
                         raise BadProgram
-        # the program is OK!
+
         linear_formula = ''
+        # the program is OK!
         first_exp = text_vector.pop(0)
         linear_formula += first_exp + '('
 
