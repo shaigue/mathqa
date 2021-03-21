@@ -8,6 +8,9 @@ from mathqa_processing import MathQAManager, MathQADatapoint
 from teacher_forcing_gru_encoder_decoder import Seq2Seq
 
 
+# TODO: add prints to a file log, and disable buffering (write immediately to file)
+
+
 def teacher_forcing_loss(target_token_indices, predicted_target_token_logits):
     seq_len, batch_size, target_vocabulary_size = predicted_target_token_logits.shape
     assert target_token_indices.shape == (seq_len, batch_size)

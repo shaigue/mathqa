@@ -1,3 +1,7 @@
 .idea
 __pycache__
 slurm*
+figures
+*.csv
+*.txt
+*.pkl

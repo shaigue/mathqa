@@ -255,8 +255,8 @@ class Program:
                         open_set.add(search_node_to_add)
 
 
-def get_data(part='test'):
-    return load_json(config.MATH_QA_PATH / f'{part}.json')
+def get_data(part: str):
+    return load_json(config.MATHQA_DIR / f'{part}.json')
 
 
 def count_repeating_functions(part, min_size, max_size, max_inputs) -> Counter:
@@ -274,10 +274,18 @@ def count_repeating_functions(part, min_size, max_size, max_inputs) -> Counter:
     return function_counter
 
 
+def total_count(counter: Counter) -> int:
+    count = 0
+    for key, amount in counter.items():
+        count += amount
+    return count
+
+
 def count_for_each_partition(min_size, max_size, max_inputs):
     partitions = ['test', 'train', 'dev']
     rows_list = []
     counters = {part: count_repeating_functions(part, min_size, max_size, max_inputs) for part in partitions}
+    programs_per_part = {part: total_count(counters[part]) for part in partitions}
     for part in partitions:
         counter = counters[part]
         part_programs = list(counter.keys())
@@ -289,8 +297,13 @@ def count_for_each_partition(min_size, max_size, max_inputs):
             rows_list.append(row)
     data_frame = pd.DataFrame(rows_list, columns=['linear_formula', 'size', 'n_inputs'] + partitions)
     data_frame.sort_values(by=partitions, ascending=False, inplace=True, ignore_index=True)
-    data_frame = data_frame[:10_000]
+    # data_frame = data_frame[:10_000]
+    # save all entries
     data_frame.to_csv('count_for_each_partition.csv', index=False)
+    # add another entry where the points are normalized with their relative percentage
+    for part in partitions:
+        data_frame[part] /= programs_per_part[part]
+    data_frame.to_csv('percent_for_each_partition.csv', index=False)
 
 
 if __name__ == "__main__":
