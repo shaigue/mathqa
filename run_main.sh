@@ -13,5 +13,5 @@ conda activate $CONDA_ENV
 # set the python path to the current directory
 export PYTHONPATH="$PWD"
 # Run python with the args to the script
-python -u main.py
+python main.py
 echo "*** SLURM BATCH JOB '$JOB_NAME' DONE ***"

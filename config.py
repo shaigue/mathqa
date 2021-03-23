@@ -1,9 +1,18 @@
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parent / "data"
+ROOT_DIR = Path(__file__).parent
+DATA_DIR = ROOT_DIR / "data"
 MATHQA_DIR = DATA_DIR / 'MathQA'
 
 MAX_VOCABULARY_SIZE = 10_000
 INTERNAL_DIM = 128
 
-# TODO: enable checkpoint loading if trainig was interapted in the middle
+MIN_MACRO_SIZE = 2
+MAX_MACRO_SIZE = 8
+MAX_MACRO_INPUTS = 5
+
+MACRO_DATA_FILE = ROOT_DIR / 'macro.pkl'
+TRAINING_LOGS_DIR = ROOT_DIR / 'training_logs'
+
+
+# TODO: enable checkpoint loading if training was interrupted in the middle

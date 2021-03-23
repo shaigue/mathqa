@@ -10,6 +10,11 @@ def default_normalize_fn(s: str) -> str:
     return s.lower()
 
 
+def default_join_fn(s: list[str]) -> str:
+    return ' '.join(s)
+
+
+# TODO: add the ability to state in advance all the tokens, without reading them from data
 class TextVectorizer:
     pad_token = '<PAD>'
     unknown_token = '<UNK>'
@@ -19,18 +24,20 @@ class TextVectorizer:
     special_tokens = [unknown_token, pad_token, end_of_sequence_token, start_of_sequence_token]
 
     def __init__(self, strings: Iterable[str], max_tokens: int = None,
-                 normalize_fn=default_normalize_fn, split_fn=default_split_fn):
+                 normalize_fn=default_normalize_fn, split_fn=default_split_fn, join_fn=default_join_fn):
+
+        assert split_fn is not None, "The split function cannot be None."
 
         self.max_tokens = max_tokens
         self.normalize_fn = normalize_fn
         self.split_fn = split_fn
+        self.join_fn = join_fn
 
         # create the mapping from tokens to indices
         counter = Counter()
         max_seq_len = 0
         for s in strings:
-            s = self.normalize_fn(s)
-            s = self.split_fn(s)
+            s = self._normalize_and_split(s)
             max_seq_len = max(max_seq_len, len(s))
             counter.update(s)
 
@@ -51,6 +58,11 @@ class TextVectorizer:
         for index, token in enumerate(self.index_to_token):
             self.token_to_index[token] = index
 
+    def _normalize_and_split(self, text: str) -> list[str]:
+        if self.normalize_fn is not None:
+            text = self.normalize_fn(text)
+        return self.split_fn(text)
+
     def convert_token_to_index(self, token: str) -> int:
         return self.token_to_index[token]
 
@@ -59,8 +71,7 @@ class TextVectorizer:
 
     def string_to_token_index_list(self, s: str) -> list[int]:
         # process the string
-        s = self.normalize_fn(s)
-        s = self.split_fn(s)
+        s = self._normalize_and_split(s)
         # add start and end of sequence tokens
         s.insert(0, self.start_of_sequence_token)
         s.append(self.end_of_sequence_token)
@@ -82,7 +93,7 @@ class TextVectorizer:
 
     def token_index_list_to_string(self, index_list: List[int]) -> str:
         token_list = self.token_index_list_to_token_list(index_list)
-        return ' '.join(token_list)
+        return self.join_fn(token_list)
 
     @property
     def pad_token_index(self):

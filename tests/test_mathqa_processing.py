@@ -21,7 +21,7 @@ class TestMathQAProcessing(unittest.TestCase):
         for m, p, s, b in itertools.product(managers, partitions, shuffle, batch_size):
             m: MathQAManager
             got_smaller = False
-            for i, datapoint in enumerate(m.get_dataset_iterator(p, b, s)):
+            for i, datapoint in enumerate(m.iter_dataset(p, b, s)):
                 # make sure that only the last batch can be smaller
                 self.assertFalse(got_smaller)
                 n = len(datapoint[0])
@@ -31,10 +31,6 @@ class TestMathQAProcessing(unittest.TestCase):
 
                 for entry in datapoint:
                     self.assertEqual(len(entry), n)
-
-    def test_token_sequence_to_linear_formula(self):
-        # TODO: implement
-        pass
 
     def test_check_correctness(self):
         # TODO: implement

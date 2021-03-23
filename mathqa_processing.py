@@ -1,81 +1,134 @@
 """Processing methods for mathqa dataset"""
 from pathlib import Path
-from typing import List, Union, Iterator
-import re
+from typing import Union, Iterator, Optional
+import math
+from collections import defaultdict
 
 import numpy as np
 
 from math_qa import dataset as mathqa
-from math_qa.linear_formula import BadProgram
+from math_qa.dataset import RawMathQAEntry
 from text_processing import TextVectorizer
+from program_graph.extract_dags import Program
+from program_graph.macro_substitution import MacroData
 
-# TODO:
-#   - build the code vocabulary from known symbols, not from data
 
-
+# TODO: build the code vocabulary from known symbols, not from data
 class MathQADatapoint:
     def __init__(self, text_token_indices: list[int], code_token_indices: list[int], extracted_numbers: list[int],
-                 linear_formula: str):
+                 program: Program):
         self.text_token_indices = text_token_indices
         self.code_token_indices = code_token_indices
         self.extracted_numbers = extracted_numbers
-        self.linear_formula = linear_formula
+        self.program = program
+
+
+class ProcessedMathQAEntry:
+    def __init__(self, raw_entry: RawMathQAEntry, refactored_program: Optional[Program] = None):
+        self.processed_problem, self.extracted_numbers = mathqa.extract_numbers_from_problem(raw_entry.problem)
+        if refactored_program is not None:
+            self.linear_formula = str(refactored_program)
+            self.program = refactored_program
+        else:
+            self.linear_formula = raw_entry.linear_formula
+            self.program = Program.from_linear_formula(self.linear_formula)
+
+
+def _check_programs_match(raw: RawMathQAEntry, processed: ProcessedMathQAEntry, macro_data: MacroData) -> bool:
+    """Checks if the original and refactored program produce the same value"""
+    inputs = processed.extracted_numbers
+    original_program = Program.from_linear_formula(raw.linear_formula)
+    original_value = original_program.eval(inputs)
+    refactored_program = processed.program
+    refactored_value = refactored_program.eval(inputs, macro_data.macro_dict)
+    return original_value == refactored_value
+
+
+def _process_raw_mathqa_entries(raw_entries: dict[str, list[RawMathQAEntry]],
+                                macro_data: Optional[MacroData] = None) -> dict[str, list[ProcessedMathQAEntry]]:
+    """Processes the raw mathqa entries, and replaces the macros in train if required."""
+    processed_entries = defaultdict(list)
+    for part, raw_entries in raw_entries.items():
+        if part == 'train' and macro_data is not None:
+            assert len(raw_entries) == len(macro_data.modified_programs), "There should be exactly the same number of" \
+                                                                          " programs"
+            # use the macro programs instead here
+            for i, raw in enumerate(raw_entries):
+                processed = ProcessedMathQAEntry(raw, macro_data.modified_programs[i])
+                assert _check_programs_match(raw, processed, macro_data), "Program evaluation does not match"
+                processed_entries[part].append(processed)
+        else:
+            for raw in raw_entries:
+                processed = ProcessedMathQAEntry(raw)
+                processed_entries[part].append(processed)
+    return processed_entries
+
+
+def _get_processed_problems(processed_entries: dict[str, list[ProcessedMathQAEntry]], partition: str) -> list[str]:
+    processed_problems = []
+    partition_entries = processed_entries[partition]
+    for entry in partition_entries:
+        processed_problems.append(entry.processed_problem)
+    return processed_problems
+
+
+def _get_linear_formulas(processed_entries: dict[str, list[ProcessedMathQAEntry]], partition: str) -> list[str]:
+    processed_problems = []
+    partition_entries = processed_entries[partition]
+    for entry in partition_entries:
+        processed_problems.append(entry.linear_formula)
+    return processed_problems
 
 
 class MathQAManager:
     partitions = ['train', 'dev', 'test']
 
-    def __init__(self, root_dir: Path, max_vocabulary_size: int, dummy=False):
+    def __init__(self, root_dir: Path, max_vocabulary_size: int, dummy=False, macro_file: Optional[Path] = None):
         self.dummy = dummy
-        self.mathqa_entries = {}
+
+        self.macro_data = None
+        if macro_file is not None:
+            self.macro_data = MacroData.from_file(macro_file)
+
+        raw_entries = {}
         for partition in self.partitions:
-            self.mathqa_entries[partition] = mathqa.load_dataset(root_dir, partition)
+            raw_entries[partition] = mathqa.load_dataset(root_dir, partition)
+
+        processed_entries = _process_raw_mathqa_entries(raw_entries, self.macro_data)
 
         # small dummy dataset to test the pipeline
         if dummy:
-            dummy_data = self.mathqa_entries['train'][:200]
+            dummy_data = processed_entries['train'][:200]
             for partition in self.partitions:
-                self.mathqa_entries[partition] = dummy_data
+                processed_entries[partition] = dummy_data
 
-        train_texts = self._get_problem_texts('train')
-        train_codes = self._get_program_strings('train')
+        train_processed_problems = _get_processed_problems(processed_entries, 'train')
+        train_linear_formulas = _get_linear_formulas(processed_entries, 'train')
 
-        self.text_vectorizer = TextVectorizer(train_texts, max_vocabulary_size)
-        self.code_vectorizer = TextVectorizer(train_codes)
-        self.operators_descriptors = mathqa.get_operators_descriptors()
-        self.operator_name_to_n_args = {od.name: od.n_args for od in self.operators_descriptors}
+        self.text_vectorizer = TextVectorizer(train_processed_problems, max_vocabulary_size)
+        self.code_vectorizer = TextVectorizer(train_linear_formulas, normalize_fn=mathqa.normalize_linear_formula,
+                                              split_fn=mathqa.tokenize_linear_formula,
+                                              join_fn=mathqa.join_tokenized_linear_formula)
 
-    def get_dataset_iterator(self, partition: Union[str, List[str]], shuffle=False) -> Iterator[MathQADatapoint]:
+        self.datapoints = self._get_datapoints(processed_entries)
+
+    def iter_dataset(self, partition: Union[str, list[str]], shuffle=False) -> Iterator[MathQADatapoint]:
         """If it is a list of strings, then concatenate the partitions"""
         if isinstance(partition, str):
             partition = [partition]
 
-        code_vectors = []
-        text_vectors = []
-        extracted_numbers = []
-        linear_formulas = []
+        datapoints = []
         for part in partition:
-            code_vectors += self._get_program_vectors(part)
-            text_vectors += self._get_problem_vectors(part)
-            extracted_numbers += self._get_problem_numbers(part)
-            linear_formulas += self._get_linear_formulas(part)
+            datapoints += self.datapoints[part]
 
-        assert len(code_vectors) == len(text_vectors) == len(extracted_numbers) == len(linear_formulas), \
-            "Got uneven sizes. something is wrong."
-
-        n_samples = len(code_vectors)
+        n_samples = len(datapoints)
         indices = np.arange(n_samples)
         if shuffle:
             rng = np.random.default_rng()
             rng.shuffle(indices)
 
         for i in indices:
-            yield MathQADatapoint(
-                code_token_indices=code_vectors[i],
-                text_token_indices=text_vectors[i],
-                extracted_numbers=extracted_numbers[i],
-                linear_formula=linear_formulas[i],
-            )
+            yield datapoints[i]
 
     @property
     def text_vocabulary_size(self):
@@ -98,126 +151,29 @@ class MathQAManager:
         return self.code_vectorizer.max_sequence_len
 
     def check_generated_code_correctness(self, code_token_indices: list[int], datapoint: MathQADatapoint) -> bool:
-        original_linear_formula = datapoint.linear_formula
-        extracted_numbers = datapoint.extracted_numbers
-        # transform to tokens into a linear formula
         try:
-            generated_linear_formula = self.token_sequence_to_linear_formula(code_token_indices, extracted_numbers)
-            generated_linear_formula = mathqa.LinearFormula(generated_linear_formula)
-            generated_evaluation = generated_linear_formula.eval(extracted_numbers)
-        # if the generated program is invalid then count that as an error
-        except BadProgram:
+            linear_formula = self.code_vectorizer.token_index_list_to_string(code_token_indices)
+            program = Program.from_linear_formula(linear_formula)
+            inputs = datapoint.extracted_numbers
+            if self.macro_data is not None:
+                macro_dict = self.macro_data.macro_dict
+            else:
+                macro_dict = None
+            value = program.eval(inputs, macro_dict)
+            target_value = datapoint.program.eval(inputs, macro_dict)
+            return math.isclose(value, target_value)
+        except:
             return False
-        # evaluate the 2 formulas with the same inputs and see if they are equal
-        original_linear_formula = mathqa.LinearFormula(original_linear_formula)
-        original_evaluation = original_linear_formula.eval(extracted_numbers)
-        return original_evaluation == generated_evaluation
 
-    def token_sequence_to_linear_formula(self, token_vector: list[int], extracted_numbers: list) -> str:
-        """Converts a sequence of tokens to a linear formula
-
-        :param token_vector: a vector of generated tokens
-        :return: a linear formula string
-        """
-        text_vector = self.code_vectorizer.token_index_list_to_token_list(token_vector)
-        if len(text_vector) == 0:
-            raise BadProgram
-        # first gather all the (op, arguments) pairs
-        operation_argument_list = []
-        last_operation = None
-        last_operation_arguments = None
-        for token in text_vector:
-            if self._is_arg(token):
-                if last_operation_arguments is None:
-                    # got argument before any operation
-                    raise BadProgram
-                last_operation_arguments.append(token)
-            else:
-                if last_operation is not None:
-                    # not the first operation to insert
-                    operation_argument_list.append((last_operation, last_operation_arguments))
-                # start a new argument list
-                last_operation = token
-                last_operation_arguments = []
-        # empty program is also bad
-        if last_operation is None:
-            raise BadProgram
-        # add the last pair
-        operation_argument_list.append((last_operation, last_operation_arguments))
-        # check that they are legal
-        for i, (operation, arguments) in enumerate(operation_argument_list):
-            # check that the number of arguments for each function are ok
-            if self.operator_name_to_n_args[operation] != len(arguments):
-                raise BadProgram
-            for arg in arguments:
-                # check that number arguments are not out of range
-                if arg.startswith('n'):
-                    num = int(arg[1:])
-                    if num >= len(extracted_numbers):
-                        raise BadProgram
-                # check that the temp arguments are smaller then the index
-                if arg.startswith('#'):
-                    num = int(arg[1:])
-                    if num >= i:
-                        raise BadProgram
-
-        linear_formula = ''
-        # the program is OK!
-        first_exp = text_vector.pop(0)
-        linear_formula += first_exp + '('
-
-        last_is_arg = False
-        for exp in text_vector:
-            if self._is_arg(exp):
-                if last_is_arg:
-                    linear_formula += ','
-                linear_formula += exp
-                last_is_arg = True
-            else:
-                linear_formula += ')|' + exp + '('
-                last_is_arg = False
-
-        linear_formula += ')'
-        return linear_formula
-
-    def _get_program_vectors(self, partition: str) -> List[List[int]]:
-        program_strings = self._get_program_strings(partition)
-        program_vectors = [self.code_vectorizer.string_to_token_index_list(s) for s in program_strings]
-        return program_vectors
-
-    def _get_problem_vectors(self, partition: str) -> List[List[int]]:
-        problem_texts = self._get_problem_texts(partition)
-        problem_vectors = [self.text_vectorizer.string_to_token_index_list(s) for s in problem_texts]
-        return problem_vectors
-
-    def _get_problem_numbers(self, partition: str) -> List[List[Union[int, float]]]:
-        problem_numbers = []
-        for entry in self.mathqa_entries[partition]:
-            problem_numbers.append(entry.processed_problem.numbers)
-        return problem_numbers
-
-    def _get_linear_formulas(self, partition: str) -> List[str]:
-        linear_formulas = []
-        for entry in self.mathqa_entries[partition]:
-            linear_formulas.append(entry.linear_formula)
-        return linear_formulas
-
-    def _get_problem_texts(self, partition: str) -> List[str]:
-        problem_texts = []
-        for entry in self.mathqa_entries[partition]:
-            problem_texts.append(entry.processed_problem.text)
-        return problem_texts
-
-    def _get_program_strings(self, partition: str) -> List[str]:
-        program_strings = []
-        for entry in self.mathqa_entries[partition]:
-            program_strings.append(entry.processed_linear_formula.get_program_string())
-        return program_strings
-
-    @staticmethod
-    def _is_arg(exp: str) -> bool:
-        arg_regexp = re.compile(r'const_\w+|n\d+|#\d+')
-        if arg_regexp.match(exp):
-            return True
-        return False
-
+    def _get_datapoints(self, processed_entries: dict[str, list[ProcessedMathQAEntry]]) -> dict[str, list[MathQADatapoint]]:
+        datapoints = defaultdict(list)
+        for part, entries in processed_entries.items():
+            for entry in entries:
+                datapoint = MathQADatapoint(
+                    text_token_indices=self.text_vectorizer.string_to_token_index_list(entry.processed_problem),
+                    code_token_indices=self.code_vectorizer.string_to_token_index_list(entry.linear_formula),
+                    extracted_numbers=entry.extracted_numbers,
+                    program=entry.program
+                )
+                datapoints[part].append(datapoint)
+        return datapoints
