@@ -60,7 +60,7 @@ def train_mathqa_vanilla_dropout():
     )
     prefix = config.TRAINING_LOGS_DIR / 'vanilla_dropout'
     prefix.mkdir(exist_ok=True)
-    train(prefix, model, manager, n_epochs=N_EPOCHS)
+    train(prefix, model, manager, n_epochs=N_EPOCHS+50)
 
 
 def train_mathqa_macro_dropout():
@@ -74,7 +74,7 @@ def train_mathqa_macro_dropout():
     )
     prefix = config.TRAINING_LOGS_DIR / 'macro_dropout'
     prefix.mkdir(exist_ok=True)
-    train(prefix, model, manager, n_epochs=N_EPOCHS)
+    train(prefix, model, manager, n_epochs=N_EPOCHS+50)
 
 
 if __name__ == "__main__":
