@@ -11,13 +11,13 @@ def get_module_device(module: nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, source_vocabulary_size: int, hidden_dim: int):
+    def __init__(self, source_vocabulary_size: int, hidden_dim: int, dropout=0.0):
         super(Encoder, self).__init__()
         self.source_vocabulary_size = source_vocabulary_size
         self.hidden_dim = hidden_dim
 
         self.embedding_layer = nn.Embedding(num_embeddings=source_vocabulary_size, embedding_dim=hidden_dim)
-        self.gru_layer = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim)
+        self.gru_layer = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, dropout=dropout)
 
     def forward(self, source_token_indices, prev_hidden_state=None):
         seq_len, batch_size = source_token_indices.shape
@@ -34,13 +34,13 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, target_vocabulary_size: int, hidden_dim: int):
+    def __init__(self, target_vocabulary_size: int, hidden_dim: int, dropout=0.0):
         super(Decoder, self).__init__()
         self.target_vocabulary_size = target_vocabulary_size
         self.hidden_dim = hidden_dim
 
         self.embedding_layer = nn.Embedding(num_embeddings=target_vocabulary_size, embedding_dim=hidden_dim)
-        self.gru_layer = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim)
+        self.gru_layer = nn.GRU(input_size=hidden_dim, hidden_size=hidden_dim, dropout=dropout)
         self.output_linear_layer = nn.Linear(in_features=hidden_dim, out_features=target_vocabulary_size)
 
     def forward(self, target_token_indices, encoder_last_hidden):
@@ -55,14 +55,14 @@ class Decoder(nn.Module):
 
 
 class Seq2Seq(nn.Module):
-    def __init__(self, source_vocabulary_size: int, target_vocabulary_size: int, hidden_dim: int):
+    def __init__(self, source_vocabulary_size: int, target_vocabulary_size: int, hidden_dim: int, dropout=0.0):
         super(Seq2Seq, self).__init__()
         self.source_vocabulary_size = source_vocabulary_size
         self.target_vocabulary_size = target_vocabulary_size
         self.hidden_dim = hidden_dim
 
-        self.encoder = Encoder(source_vocabulary_size, hidden_dim)
-        self.decoder = Decoder(target_vocabulary_size, hidden_dim)
+        self.encoder = Encoder(source_vocabulary_size, hidden_dim, dropout=dropout)
+        self.decoder = Decoder(target_vocabulary_size, hidden_dim, dropout=dropout)
 
     def forward(self, source_token_indices, target_token_indices):
         encoder_output, encoder_last_hidden_state = self.encoder(source_token_indices)

@@ -50,6 +50,33 @@ def train_mathqa_macro():
     train(prefix, model, manager, n_epochs=N_EPOCHS)
 
 
+def train_mathqa_vanilla_dropout():
+    manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=config.MAX_VOCABULARY_SIZE, dummy=False)
+    model = Seq2Seq(
+        source_vocabulary_size=manager.text_vocabulary_size,
+        target_vocabulary_size=manager.code_vocabulary_size,
+        hidden_dim=config.INTERNAL_DIM,
+        dropout=0.2
+    )
+    prefix = config.TRAINING_LOGS_DIR / 'vanilla_dropout'
+    prefix.mkdir(exist_ok=True)
+    train(prefix, model, manager, n_epochs=N_EPOCHS)
+
+
+def train_mathqa_macro_dropout():
+    manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=config.MAX_VOCABULARY_SIZE, dummy=False,
+                            macro_file=config.MACRO_DATA_FILE)
+    model = Seq2Seq(
+        source_vocabulary_size=manager.text_vocabulary_size,
+        target_vocabulary_size=manager.code_vocabulary_size,
+        hidden_dim=config.INTERNAL_DIM,
+        dropout=0.2
+    )
+    prefix = config.TRAINING_LOGS_DIR / 'macro_dropout'
+    prefix.mkdir(exist_ok=True)
+    train(prefix, model, manager, n_epochs=N_EPOCHS)
+
+
 if __name__ == "__main__":
-    train_mathqa_vanilla()
-    train_mathqa_macro()
+    train_mathqa_vanilla_dropout()
+    train_mathqa_macro_dropout()

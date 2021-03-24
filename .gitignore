@@ -6,3 +6,5 @@ figures
 *.txt
 *.pkl
 !macro.pkl
+training_logs/model.pt
+training_logs/train_log.json
