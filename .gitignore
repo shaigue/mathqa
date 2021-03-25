@@ -8,3 +8,4 @@ figures
 !macros/*
 training_logs/model.pt
 training_logs/train_log.json
+*.log

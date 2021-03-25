@@ -6,7 +6,7 @@ import pickle
 from pathlib import Path
 
 import math_qa.dataset as mathqa
-from program_graph.extract_dags import Program, Node
+from program_graph.extract_dags import Program, Node, OperationNode
 import config
 import logging
 import time
@@ -29,7 +29,7 @@ def get_programs(partition: str) -> list[Program]:
 @dataclass(frozen=True)
 class MacroAssociation:
     index: int
-    vertex_subset: frozenset[Node]
+    vertex_subset: frozenset[OperationNode]
 
     def conflicts(self, other) -> bool:
         """Checks if 2 macro_10 associations conflict, i.e. whether they have the same index and non-empty intersection in
@@ -209,14 +209,14 @@ def filter_self_conflicting_macros(macro_associations: dict[Program, list[MacroA
 def perform_macro_augmentation_on_train(n_macros: int, save_every=None):
     program_list = get_programs('train')
     # extract all the macro_10 associations
-    logging.info(f"getting all macro_10 associations...")
+    logging.info(f"getting all macro associations...")
     macro_associations = get_all_macro_associations(program_list)
     # removing the self conflicts from the list
     macro_associations = filter_self_conflicting_macros(macro_associations)
     # extract n_macros
     extracted_macros = []
     for macro_num in range(n_macros):
-        logging.info(f"replacing macro_10 {macro_num}")
+        logging.info(f"replacing macro {macro_num}")
         # find the best ranking one
         best_macro = find_best_macro(macro_associations)
         # replace all it's appearances in the programs
