@@ -260,3 +260,56 @@ INFO:root:extracting macro_10 from program number=25700
 INFO:root:extracting macro_10 from program number=25800
 INFO:root:extracting macro_10 from program number=25900
 INFO:root:extracting macro_10 from program number=26000
+INFO:root:extracting macro_10 from program number=26100
+INFO:root:extracting macro_10 from program number=26200
+INFO:root:extracting macro_10 from program number=26300
+INFO:root:extracting macro_10 from program number=26400
+INFO:root:extracting macro_10 from program number=26500
+INFO:root:extracting macro_10 from program number=26600
+INFO:root:extracting macro_10 from program number=26700
+INFO:root:extracting macro_10 from program number=26800
+INFO:root:extracting macro_10 from program number=26900
+INFO:root:extracting macro_10 from program number=27000
+INFO:root:extracting macro_10 from program number=27100
+INFO:root:extracting macro_10 from program number=27200
+INFO:root:extracting macro_10 from program number=27300
+INFO:root:extracting macro_10 from program number=27400
+INFO:root:extracting macro_10 from program number=27500
+INFO:root:extracting macro_10 from program number=27600
+INFO:root:extracting macro_10 from program number=27700
+INFO:root:extracting macro_10 from program number=27800
+INFO:root:extracting macro_10 from program number=27900
+INFO:root:extracting macro_10 from program number=28000
+INFO:root:extracting macro_10 from program number=28100
+INFO:root:extracting macro_10 from program number=28200
+INFO:root:extracting macro_10 from program number=28300
+INFO:root:extracting macro_10 from program number=28400
+INFO:root:extracting macro_10 from program number=28500
+INFO:root:extracting macro_10 from program number=28600
+INFO:root:extracting macro_10 from program number=28700
+INFO:root:extracting macro_10 from program number=28800
+INFO:root:extracting macro_10 from program number=28900
+INFO:root:extracting macro_10 from program number=29000
+INFO:root:extracting macro_10 from program number=29100
+INFO:root:extracting macro_10 from program number=29200
+INFO:root:extracting macro_10 from program number=29300
+INFO:root:extracting macro_10 from program number=29400
+INFO:root:extracting macro_10 from program number=29500
+INFO:root:extracting macro_10 from program number=29600
+INFO:root:extracting macro_10 from program number=29700
+INFO:root:extracting macro_10 from program number=29800
+INFO:root:replacing macro_10 0
+INFO:root:saving 1 extracted_macros...
+INFO:root:replacing macro_10 1
+INFO:root:replacing macro_10 2
+INFO:root:saving 3 extracted_macros...
+INFO:root:replacing macro_10 3
+INFO:root:replacing macro_10 4
+INFO:root:saving 5 extracted_macros...
+INFO:root:replacing macro_10 5
+INFO:root:replacing macro_10 6
+INFO:root:saving 7 extracted_macros...
+INFO:root:replacing macro_10 7
+INFO:root:replacing macro_10 8
+INFO:root:finished refactoring, saving macros and programs to file...
+INFO:root:finished. total time=34424.578364133835

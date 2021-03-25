@@ -17,8 +17,10 @@ def get_x_y_from_logs(log_list):
 
 
 #%%
-macro_logs = get_experiment_logs('macro_10')
-vanilla_logs = get_experiment_logs('vanilla')
+# macro_logs = get_experiment_logs('macro_10')
+macro_logs = get_experiment_logs('macro_10_150')
+# vanilla_logs = get_experiment_logs('vanilla')
+vanilla_logs = get_experiment_logs('vanilla_150')
 
 
 #%%

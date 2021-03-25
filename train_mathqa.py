@@ -7,7 +7,7 @@ from typing import Union
 import torch
 import torch.nn.functional as F
 from mathqa_processing import MathQAManager, MathQADatapoint
-from teacher_forcing_gru_encoder_decoder import Seq2Seq
+from simple_seq2seq import Seq2Seq
 
 
 # TODO: add some nicer logging to this
@@ -164,7 +164,7 @@ def example():
     train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=50)
     # macro example
     manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True,
-                            macro_file=config.MACRO_DATA_FILE)
+                            macro_file=config.MACRO_10_FILE)
     model = Seq2Seq(
         source_vocabulary_size=manager.text_vocabulary_size,
         target_vocabulary_size=manager.code_vocabulary_size,

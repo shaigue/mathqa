@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Union, Iterator, Optional
 import math
 from collections import defaultdict
+from enum import Enum
 
 import numpy as np
 
@@ -11,6 +12,14 @@ from math_qa.dataset import RawMathQAEntry
 from text_processing import TextVectorizer
 from program_graph.extract_dags import Program
 from program_graph.macro_substitution import MacroData
+
+
+# TODO: add error types report during training
+
+class ErrorType(Enum):
+    no_error = 0
+    syntax = 1
+    value = 2
 
 
 # TODO: build the code vocabulary from known symbols, not from data
@@ -150,7 +159,8 @@ class MathQAManager:
     def code_max_len(self):
         return self.code_vectorizer.max_sequence_len
 
-    def check_generated_code_correctness(self, code_token_indices: list[int], datapoint: MathQADatapoint) -> bool:
+    def check_generated_code_correctness(self, code_token_indices: list[int], datapoint: MathQADatapoint,
+                                         return_error_type=False) -> Union[bool, ErrorType]:
         try:
             linear_formula = self.code_vectorizer.token_index_list_to_string(code_token_indices)
             program = Program.from_linear_formula(linear_formula)
@@ -161,8 +171,13 @@ class MathQAManager:
                 macro_dict = None
             value = program.eval(inputs, macro_dict)
             target_value = datapoint.program.eval(inputs, macro_dict)
-            return math.isclose(value, target_value)
+            correct = math.isclose(value, target_value)
+            if return_error_type:
+                return ErrorType.no_error if correct else ErrorType.value
+            return correct
         except:
+            if return_error_type:
+                return ErrorType.syntax
             return False
 
     def _get_datapoints(self, processed_entries: dict[str, list[ProcessedMathQAEntry]]) -> dict[str, list[MathQADatapoint]]:
