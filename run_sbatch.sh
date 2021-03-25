@@ -5,7 +5,7 @@ NUM_NODES=1
 NUM_CORES=2
 NUM_GPUS=1
 JOB_NAME="mathqa"
-OUTPUT_FILE="slurm.out"
+OUTPUT_FILE="slurm-%j.out"
 
 sbatch \
 	-N $NUM_NODES \
