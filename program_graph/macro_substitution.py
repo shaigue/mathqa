@@ -32,7 +32,7 @@ class MacroAssociation:
     vertex_subset: frozenset[Node]
 
     def conflicts(self, other) -> bool:
-        """Checks if 2 macro associations conflict, i.e. whether they have the same index and non-empty intersection in
+        """Checks if 2 macro_10 associations conflict, i.e. whether they have the same index and non-empty intersection in
         in their vertex_subset.
 
         :param other:
@@ -44,7 +44,7 @@ class MacroAssociation:
 
 def get_macros_with_association(program: Program, program_index: int) -> dict[Program, list[MacroAssociation]]:
     """Finds for a single program all the macros that are associated with it,
-    and logs the vertex indices that each macro involves.
+    and logs the vertex indices that each macro_10 involves.
 
     :param program:
     :param program_index:
@@ -71,7 +71,7 @@ def get_all_macro_associations(program_list: list[Program]) -> dict[Program, lis
     macro_accumulator = defaultdict(list)
     for program_index, program in enumerate(program_list):
         if (program_index + 1) % 100 == 0:
-            logging.info(f"extracting macro from program number={program_index + 1}")
+            logging.info(f"extracting macro_10 from program number={program_index + 1}")
         current_program_macro_dict = get_macros_with_association(program, program_index)
         # this will append the lists in the current locations
         for macro, association_list in current_program_macro_dict.items():
@@ -96,7 +96,7 @@ def remove_conflicts_from_list(target_list: list[MacroAssociation], to_remove_li
 
 def remove_conflicting_associations(macro_associations: dict[Program, list[MacroAssociation]],
                                     target_macro: Program) -> dict[Program, list[MacroAssociation]]:
-    """Copies the current macro associations, and removes from it all the associations that conflict with the macro
+    """Copies the current macro_10 associations, and removes from it all the associations that conflict with the macro_10
     """
     assert target_macro in macro_associations, "target_macro has to be in macro_associations."
 
@@ -124,7 +124,7 @@ def macro_score(program: Program, times_appeared: int) -> float:
 
 
 def find_best_macro(macro_associations: dict[Program, list[MacroAssociation]]) -> Program:
-    """Given macro associations, selects the one with the highest score."""
+    """Given macro_10 associations, selects the one with the highest score."""
     assert len(macro_associations) > 0, "got empty macro_associations"
     max_macro = None
     max_score = 0
@@ -134,7 +134,7 @@ def find_best_macro(macro_associations: dict[Program, list[MacroAssociation]]) -
             max_macro = macro
             max_score = score
 
-    assert max_macro is not None, "trying to return a None macro."
+    assert max_macro is not None, "trying to return a None macro_10."
     return max_macro
 
 
@@ -144,7 +144,7 @@ def get_macro_symbol(macro_num: int) -> str:
 
 def replace_macro_in_list(program_list: list[Program],
                           macro_num: int, macro: Program, associations: list[MacroAssociation]) -> list[Program]:
-    """Returns a modified list where the macro has been substituted in the associated parts"""
+    """Returns a modified list where the macro_10 has been substituted in the associated parts"""
     symbol = get_macro_symbol(macro_num)
     transformed_programs = deepcopy(program_list)
     for association in associations:
@@ -199,43 +199,47 @@ def filter_conflicting_associations(associations: list[MacroAssociation]) -> lis
 
 def filter_self_conflicting_macros(macro_associations: dict[Program, list[MacroAssociation]]) -> \
         dict[Program, list[MacroAssociation]]:
-    """Removes for each macro any conflicting associations"""
+    """Removes for each macro_10 any conflicting associations"""
     new_associations = {}
     for macro, associations in macro_associations.items():
         new_associations[macro] = filter_conflicting_associations(associations)
     return new_associations
 
 
-def perform_macro_augmentation_on_train(n_macros: int):
+def perform_macro_augmentation_on_train(n_macros: int, save_every=None):
     program_list = get_programs('train')
-    # extract all the macro associations
-    logging.info(f"getting all macro associations...")
+    # extract all the macro_10 associations
+    logging.info(f"getting all macro_10 associations...")
     macro_associations = get_all_macro_associations(program_list)
     # removing the self conflicts from the list
     macro_associations = filter_self_conflicting_macros(macro_associations)
     # extract n_macros
     extracted_macros = []
     for macro_num in range(n_macros):
-        logging.info(f"replacing macro {macro_num}")
+        logging.info(f"replacing macro_10 {macro_num}")
         # find the best ranking one
         best_macro = find_best_macro(macro_associations)
         # replace all it's appearances in the programs
         program_list = replace_macro_in_list(program_list, macro_num, best_macro, macro_associations[best_macro])
         # remove the conflicting macros
         macro_associations = remove_conflicting_associations(macro_associations, best_macro)
-        # remove the extracted macro
+        # remove the extracted macro_10
         macro_associations.pop(best_macro)
         extracted_macros.append(best_macro)
+
+        if save_every is not None and (macro_num % save_every) == 0 and macro_num != (n_macros - 1):
+            logging.info(f"saving {macro_num + 1} extracted_macros...")
+            save_macro_extraction(extracted_macros, program_list, config.MACRO_DIR / f'{macro_num + 1}.pkl')
     # save the required data to a file
     logging.info("finished refactoring, saving macros and programs to file...")
-    save_macro_extraction(extracted_macros, program_list)
+    save_macro_extraction(extracted_macros, program_list, config.MACRO_DIR / f'{n_macros}.pkl')
 
 
 def example():
     logging.basicConfig(filename='macro_extraction_logs.log', filemode='w', level=logging.INFO)
     start_time = time.time()
     logging.info("starting to log...")
-    perform_macro_augmentation_on_train(10)
+    perform_macro_augmentation_on_train(9, save_every=2)
     end_time = time.time()
     logging.info(f"finished. total time={end_time - start_time}")
 

@@ -52,7 +52,7 @@ def _process_raw_mathqa_entries(raw_entries: dict[str, list[RawMathQAEntry]],
         if part == 'train' and macro_data is not None:
             assert len(raw_entries) == len(macro_data.modified_programs), "There should be exactly the same number of" \
                                                                           " programs"
-            # use the macro programs instead here
+            # use the macro_10 programs instead here
             for i, raw in enumerate(raw_entries):
                 processed = ProcessedMathQAEntry(raw, macro_data.modified_programs[i])
                 assert _check_programs_match(raw, processed, macro_data), "Program evaluation does not match"
