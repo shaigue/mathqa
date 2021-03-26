@@ -1,29 +1,10 @@
 """Main script to run on the server"""
-import os
-from pathlib import Path
-
-from program_graph.macro_substitution import perform_macro_augmentation_on_train
 import config
 from mathqa_processing import MathQAManager
 from simple_seq2seq import Seq2Seq
-from train_mathqa import train, evaluate
+from train_mathqa import train
 
-
-def try_gpu():
-    print("STARTING SCRIPT...")
-    try:
-        import torch
-        print("import torch SUCCESS")
-        if torch.cuda.is_available():
-            print("having gpu!!!")
-        else:
-            print("not having gpu")
-
-    except:
-        print("import torch FAIL")
-    print("FINISHED")
-
-
+_logger = config.get_logger(__file__)
 N_EPOCHS = 100
 
 
@@ -80,11 +61,8 @@ def train_mathqa_macro_dropout():
 
 
 def different_number_of_macros():
-    # print("starting to extract macros...", flush=True)
-    # perform_macro_augmentation_on_train(9, save_every=2)
 
     for n_macros in range(1, 10, 2):
-        print(f"starting training with n_macros={n_macros}...", flush=True)
         macro_file = config.MACRO_DIR / f'{n_macros}.pkl'
         manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=config.MAX_VOCABULARY_SIZE, dummy=False,
                                 macro_file=macro_file)
@@ -100,5 +78,3 @@ def different_number_of_macros():
 
 if __name__ == "__main__":
     different_number_of_macros()
-    # train_mathqa_vanilla_dropout()
-    # train_mathqa_macro_dropout()

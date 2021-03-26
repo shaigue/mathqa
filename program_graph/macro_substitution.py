@@ -1,15 +1,18 @@
 """This is a script to augment the dataset with macros, by replacing them in the real dataset"""
 from collections import defaultdict
-from dataclasses import dataclass
 from copy import deepcopy
-import pickle
-from pathlib import Path
-
-import math_qa.dataset as mathqa
-from program_graph.extract_dags import Program, Node, OperationNode
-import config
+from dataclasses import dataclass
 import logging
-import time
+from pathlib import Path
+import pickle
+
+from math_qa import math_qa
+from program_graph.program import Program, Node, OperationNode
+import config
+
+
+# setting the logger for this module
+_logger = config.get_logger(__file__)
 
 
 def get_programs(partition: str) -> list[Program]:
@@ -18,7 +21,7 @@ def get_programs(partition: str) -> list[Program]:
     :param partition:
     :return: a list of all the programs in the partition, with the same ordering
     """
-    data = mathqa.load_dataset(config.MATHQA_DIR, partition)
+    data = math_qa.load_dataset(config.MATHQA_DIR, partition)
     programs = []
     for datapoint in data:
         program = Program.from_linear_formula(datapoint.linear_formula)
@@ -38,8 +41,7 @@ class MacroAssociation:
         :param other:
         :return:
         """
-        if __name__ == '__main__':
-            return self.index == other.index and len(self.vertex_subset.intersection(other.vertex_subset)) > 0
+        return self.index == other.index and len(self.vertex_subset.intersection(other.vertex_subset)) > 0
 
 
 def get_macros_with_association(program: Program, program_index: int) -> dict[Program, list[MacroAssociation]]:
@@ -71,7 +73,7 @@ def get_all_macro_associations(program_list: list[Program]) -> dict[Program, lis
     macro_accumulator = defaultdict(list)
     for program_index, program in enumerate(program_list):
         if (program_index + 1) % 100 == 0:
-            logging.info(f"extracting macro_10 from program number={program_index + 1}")
+            _logger.info(f"extracting macros from program={program_index + 1} out of {len(program_list)}")
         current_program_macro_dict = get_macros_with_association(program, program_index)
         # this will append the lists in the current locations
         for macro, association_list in current_program_macro_dict.items():
@@ -209,14 +211,13 @@ def filter_self_conflicting_macros(macro_associations: dict[Program, list[MacroA
 def perform_macro_augmentation_on_train(n_macros: int, save_every=None):
     program_list = get_programs('train')
     # extract all the macro_10 associations
-    logging.info(f"getting all macro associations...")
     macro_associations = get_all_macro_associations(program_list)
     # removing the self conflicts from the list
     macro_associations = filter_self_conflicting_macros(macro_associations)
     # extract n_macros
     extracted_macros = []
     for macro_num in range(n_macros):
-        logging.info(f"replacing macro {macro_num}")
+        _logger.info(f"substituting macro={macro_num + 1} out of {n_macros}")
         # find the best ranking one
         best_macro = find_best_macro(macro_associations)
         # replace all it's appearances in the programs
@@ -228,20 +229,15 @@ def perform_macro_augmentation_on_train(n_macros: int, save_every=None):
         extracted_macros.append(best_macro)
 
         if save_every is not None and (macro_num % save_every) == 0 and macro_num != (n_macros - 1):
-            logging.info(f"saving {macro_num + 1} extracted_macros...")
+            _logger.info(f"saving macro file no. {macro_num + 1}")
             save_macro_extraction(extracted_macros, program_list, config.MACRO_DIR / f'{macro_num + 1}.pkl')
     # save the required data to a file
-    logging.info("finished refactoring, saving macros and programs to file...")
+    _logger.info(f"finished extracting macros, saving to file")
     save_macro_extraction(extracted_macros, program_list, config.MACRO_DIR / f'{n_macros}.pkl')
 
 
 def example():
-    logging.basicConfig(filename='macro_extraction_logs.log', filemode='w', level=logging.INFO)
-    start_time = time.time()
-    logging.info("starting to log...")
     perform_macro_augmentation_on_train(9, save_every=2)
-    end_time = time.time()
-    logging.info(f"finished. total time={end_time - start_time}")
 
 
 if __name__ == "__main__":

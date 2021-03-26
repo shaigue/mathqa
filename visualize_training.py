@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 #%%
-from utils import get_experiment_logs
+from config import get_experiment_logs
 
 
 #%%

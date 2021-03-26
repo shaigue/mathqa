@@ -1,7 +1,7 @@
 .idea
 __pycache__
 slurm*
-figures
+#figures
 *.csv
 *.txt
 *.pkl
@@ -9,3 +9,4 @@ figures
 training_logs/model.pt
 training_logs/train_log.json
 *.log
+logging_example.py

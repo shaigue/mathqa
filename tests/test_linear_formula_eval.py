@@ -1,5 +1,5 @@
 import unittest
-import math_qa.dataset as mathqa
+import math_qa.math_qa as mathqa
 import config
 
 

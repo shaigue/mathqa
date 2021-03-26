@@ -3,8 +3,8 @@
 import unittest
 
 import config
-from program_graph.extract_dags import Program, OperationNode
-import math_qa.dataset as mathqa
+from program_graph.program import Program, OperationNode
+import math_qa.math_qa as mathqa
 
 
 class MyTestCase(unittest.TestCase):

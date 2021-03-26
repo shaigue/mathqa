@@ -1,5 +1,5 @@
 import unittest
-from math_qa.dataset import tokenize_linear_formula, normalize_linear_formula, join_tokenized_linear_formula
+from math_qa.math_qa import tokenize_linear_formula, normalize_linear_formula, join_tokenized_linear_formula
 
 
 class TestMathQA(unittest.TestCase):
