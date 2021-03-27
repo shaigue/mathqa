@@ -8,9 +8,11 @@ import torch
 import torch.nn.functional as F
 from mathqa_processing import MathQAManager, MathQADatapoint
 from simple_seq2seq import Seq2Seq
+import config
+
+_logger = config.get_logger(__file__, mode='a')
 
 
-# TODO: add some nicer logging to this
 def teacher_forcing_loss(target_token_indices, predicted_target_token_logits):
     seq_len, batch_size, target_vocabulary_size = predicted_target_token_logits.shape
     assert target_token_indices.shape == (seq_len, batch_size)
@@ -113,44 +115,42 @@ def train(prefix: Path, model: Seq2Seq, mathqa_manager: MathQAManager, n_epochs:
 
     best_dev_correctness_rate = 0
     logs = defaultdict(list)
-    print(f"using device={device}. starting training session {prefix.name}.", flush=True)
+    _logger.info(f"using device={device}. starting training session {prefix.name}.")
     for epoch_index in range(n_epochs):
         epoch_loss = train_epoch(model, optimizer, mathqa_manager, device)
-        print(f"epoch={epoch_index}, loss={epoch_loss}", flush=True)
+        _logger.info(f"epoch={epoch_index}, loss={epoch_loss}")
 
         logs['epoch_loss'].append({'epoch': epoch_index, 'value': epoch_loss})
 
         # checkpoint - save only the best performing model on dev
         if (epoch_index + 1) % evaluate_every == 0 or epoch_index == n_epochs - 1:
-            print("evaluating...", flush=True)
             train_correctness_rate = evaluate(model, mathqa_manager, 'train', device)
             dev_correctness_rate = evaluate(model, mathqa_manager, 'dev', device)
-            print(f"train_correctness_rate={train_correctness_rate}", f"dev_correctness_rate={dev_correctness_rate}",
-                  sep='\n', flush=True)
+            _logger.info(f"train_correctness_rate={train_correctness_rate}")
+            _logger.info(f"dev_correctness_rate={dev_correctness_rate}")
 
             logs['train_correctness_rate'].append({'epoch': epoch_index, 'value': train_correctness_rate})
             logs['dev_correctness_rate'].append({'epoch': epoch_index, 'value': dev_correctness_rate})
             # check if to save the model
             if dev_correctness_rate > best_dev_correctness_rate:
-                print(f"saving best model checkpoint at epoch={epoch_index + 1}", flush=True)
+                _logger.info(f"saving best model checkpoint at epoch={epoch_index}")
                 torch.save(model.state_dict(), checkpoint_file)
                 best_dev_correctness_rate = dev_correctness_rate
             # update the scheduler
             lr_scheduler.step(dev_correctness_rate)
 
-    print("training done. evaluating...", flush=True)
     # make sure to load the best performing model on dev
     model.load_state_dict(torch.load(checkpoint_file))
     # evaluate on each one of the partitions, and save their correctness rate and per_sample correctness in the logs
     for part in mathqa_manager.partitions:
         correctness_rate, per_sample_success = evaluate(model, mathqa_manager, part, device, return_per_sample=True)
-        print(f"{part}_correctness_rate={correctness_rate}", flush=True)
+        _logger.info(f"{part}_correctness_rate={correctness_rate}")
         logs[f'{part}_correctness_rate'].append({'epoch': n_epochs, 'value': correctness_rate})
         logs[f'{part}_per_sample_correctness'] = per_sample_success
     # save logs
     with open(logs_file, 'w') as f:
         json.dump(logs, f)
-    print("evaluation done. finished.", flush=True)
+    _logger.info(f"{prefix.name} training finished")
 
 
 def example():

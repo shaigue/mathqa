@@ -7,10 +7,10 @@ from enum import Enum
 
 import numpy as np
 
-from math_qa import dataset as mathqa
-from math_qa.dataset import RawMathQAEntry
+from math_qa import math_qa as mathqa
+from math_qa.math_qa import RawMathQAEntry
 from text_processing import TextVectorizer
-from program_graph.extract_dags import Program
+from program_graph.program import Program
 from program_graph.macro_substitution import MacroData
 
 

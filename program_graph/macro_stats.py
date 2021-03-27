@@ -1,13 +1,11 @@
-import logging
-import pickle
-import time
 from collections import Counter
+import pickle
 
 import pandas as pd
 
 import config
-from math_qa.dataset import _load_json
-from program_graph.extract_dags import Program
+from math_qa.math_qa import _load_json
+from program_graph.program import Program
 
 
 def get_data(part: str):
@@ -19,7 +17,6 @@ def count_repeating_functions(part, min_size, max_size, max_inputs) -> Counter:
     function_counter = Counter()
     data = get_data(part)
     for i, dp in enumerate(data):
-        logging.info(f"{i+1} out of {len(data)} in {part}...")
         program = Program.from_linear_formula(dp.linear_formula)
         function_counter.update(program.function_cut_iterator(min_size, max_size, max_inputs))
 
@@ -62,9 +59,4 @@ def count_for_each_partition(min_size, max_size, max_inputs):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, filemode='w', filename='log.txt')
-    start_time = time.time()
     count_for_each_partition(min_size=2, max_size=10, max_inputs=5)
-    elapsed_time = time.time() - start_time
-    logging.info(f"***finished***")
-    logging.info(f"time={elapsed_time} seconds")
