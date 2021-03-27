@@ -1,5 +1,9 @@
 from statistics import mean
+from typing import Union
+import itertools
+
 import torch
+import numpy as np
 
 from config import get_experiment_logs
 from math_qa.math_qa import load_dataset, RawMathQAEntry
@@ -71,6 +75,40 @@ def print_stats():
 
 # TODO: make a get_manager and get_model functions.
 # TODO: save the special configurations for an experiment in a file to be automatically reproduced
+def get_error_types(device, logs: dict, manager: MathQAManager, model, partition: str) -> list[ErrorType]:
+    per_sample_correctness = logs[f'{partition}_per_sample_correctness']
+    # go find out, out of all the dev errors for the macro_10 model,
+    # what percentage of them are syntax errors
+    per_sample_error_type = []
+    samples = manager.iter_dataset(partition)
+    for i, (correct, datapoint) in enumerate(zip(per_sample_correctness, samples)):
+        if not correct:
+            error_type = evaluate_datapoint(model, manager, datapoint, device, return_error_type=True)
+            per_sample_error_type.append(error_type)
+        else:
+            per_sample_error_type.append(ErrorType.no_error)
+
+    return per_sample_error_type
+
+
+def count_errors(error_type_list: list[ErrorType], return_percent=False) -> tuple:
+    n_correct = 0
+    n_value = 0
+    n_syntax = 0
+    for error_type in error_type_list:
+        if error_type == ErrorType.no_error:
+            n_correct += 1
+        elif error_type == ErrorType.syntax:
+            n_syntax += 1
+        elif error_type == ErrorType.value:
+            n_value += 1
+        else:
+            assert False, "should not get here"
+    if return_percent:
+        total = n_value + n_correct + n_syntax
+        return n_correct / total, n_syntax / total, n_value / total
+    return n_correct, n_syntax, n_value
+
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -105,18 +143,23 @@ def main():
     state_dict = torch.load(state_dict_path, map_location=device)
     vanilla_model.load_state_dict(state_dict)
     # collect all the errors
-    vanilla_dev_correctness = vanilla_logs['dev_per_sample_correctness']
-    macro_10_dev_correctness = macro_10_logs['dev_per_sample_correctness']
-    # go find out, out of all the dev errors for the macro_10 model,
-    # what percentage of them are syntax errors
-    n_syntax_errors = 0
-    n_errors = 0
-    samples = macro_10_manager.iter_dataset('dev')
-    for i, (correct, datapoint) in enumerate(zip(macro_10_dev_correctness, samples)):
-        if not correct:
-            n_errors += 1
-            # TODO: use the returned error type
-            evaluate_datapoint(macro_10_model, macro_10_manager, datapoint, device)
+    partition = 'test'
+    macro_10_error_type = get_error_types(device, macro_10_logs, macro_10_manager, macro_10_model, partition)
+    vanilla_error_type = get_error_types(device, vanilla_logs, vanilla_manager, vanilla_model, partition)
+    # errors = count_errors(macro_10_error_type, return_percent=True)
+    # print(f"macro: correct={errors[0]:.2f}, syntax={errors[1]:.2f}, value={errors[2]:.2f}")
+    # errors = count_errors(vanilla_error_type, return_percent=True)
+    # print(f"vanilla: correct={errors[0]:.2f}, syntax={errors[1]:.2f}, value={errors[2]:.2f}")
+    # sample 20 samples from both correct, both wrong, one wrong one correct
+    n_samples = 20
+    macro_10_correct = np.array([et == ErrorType.no_error for et in macro_10_error_type])
+    vanilla_correct = np.array([et == ErrorType.no_error for et in vanilla_error_type])
+    indices = np.arange(len(macro_10_correct))
+    for macro_10_flag, vanilla_flag in itertools.product([True, False], repeat=2):
+        mask = (vanilla_correct == vanilla_flag) & (macro_10_correct == macro_10_flag)
+        mask = mask / mask.sum()
+        sample_indices = np.random.choice(indices, n_samples, replace=False, p=mask)
+        print(sample_indices)
 
 
 if __name__ == "__main__":

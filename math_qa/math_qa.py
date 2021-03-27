@@ -159,3 +159,45 @@ def tokenize_linear_formula(linear_formula: str) -> list[str]:
 
 def join_tokenized_linear_formula(tokenized_linear_formula: list[str]) -> str:
     return ''.join(tokenized_linear_formula)
+
+
+def tokenize_linear_formula_no_punctuations(linear_formula: str) -> list[str]:
+    """Splits the linear formula into individual tokens."""
+    symbol_list = re.split(r'[,|() ]', linear_formula)
+    symbol_list = list(filter(lambda x: x != '', symbol_list))
+    return symbol_list
+
+
+def join_tokenized_linear_formula_no_punctuations(tokenized_linear_formula: list[str]) -> str:
+    def is_arg(token: str) -> bool:
+        m = re.match(r'n\d+|#\d+|const_\w+', token)
+        return m is not None
+
+    last_type = None
+    linear_formula = ''
+    for token in tokenized_linear_formula:
+        if is_arg(token):
+            if last_type is None:
+                raise RuntimeError('should not start with argument')
+            elif last_type == 'arg':
+                linear_formula += ','
+            elif last_type == 'op':
+                linear_formula += '('
+            else:
+                assert False, "should not get here"
+            last_type = 'arg'
+        else:
+            if last_type is None:
+                pass
+            elif last_type == 'arg':
+                linear_formula += ')|'
+            elif last_type == 'op':
+                linear_formula += '()|'
+            else:
+                assert False, "should not get here"
+            last_type = 'op'
+
+        linear_formula += token
+
+    linear_formula += ')'
+    return linear_formula

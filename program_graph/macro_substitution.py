@@ -10,6 +10,8 @@ from math_qa import math_qa
 from program_graph.program import Program, Node, OperationNode
 import config
 
+# TODO: add word vectors to the system
+# TODO: save the macros as a string instead of pickle. IMPORTANT
 
 # setting the logger for this module
 _logger = config.get_logger(__file__)

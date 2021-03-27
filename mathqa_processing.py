@@ -92,7 +92,8 @@ def _get_linear_formulas(processed_entries: dict[str, list[ProcessedMathQAEntry]
 class MathQAManager:
     partitions = ['train', 'dev', 'test']
 
-    def __init__(self, root_dir: Path, max_vocabulary_size: int, dummy=False, macro_file: Optional[Path] = None):
+    def __init__(self, root_dir: Path, max_vocabulary_size: int, dummy=False, macro_file: Optional[Path] = None,
+                 no_punctuation: bool = False):
         self.dummy = dummy
 
         self.macro_data = None
@@ -115,9 +116,17 @@ class MathQAManager:
         train_linear_formulas = _get_linear_formulas(processed_entries, 'train')
 
         self.text_vectorizer = TextVectorizer(train_processed_problems, max_vocabulary_size)
+
+        if no_punctuation:
+            join_fn = mathqa.join_tokenized_linear_formula_no_punctuations
+            split_fn = mathqa.tokenize_linear_formula_no_punctuations
+        else:
+            join_fn = mathqa.join_tokenized_linear_formula
+            split_fn = mathqa.tokenize_linear_formula
+
         self.code_vectorizer = TextVectorizer(train_linear_formulas, normalize_fn=mathqa.normalize_linear_formula,
-                                              split_fn=mathqa.tokenize_linear_formula,
-                                              join_fn=mathqa.join_tokenized_linear_formula)
+                                              split_fn=split_fn,
+                                              join_fn=join_fn)
 
         self.datapoints = self._get_datapoints(processed_entries)
 

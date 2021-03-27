@@ -9,4 +9,4 @@ slurm*
 training_logs/model.pt
 training_logs/train_log.json
 *.log
-logging_example.py
+*_example.py

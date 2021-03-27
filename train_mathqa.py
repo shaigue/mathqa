@@ -63,7 +63,8 @@ def train_epoch(model: Seq2Seq, optimizer: torch.optim.Optimizer, mathqa_manager
     return avg_loss
 
 
-def evaluate_datapoint(model: Seq2Seq, manager: MathQAManager, datapoint: MathQADatapoint, device) -> bool:
+def evaluate_datapoint(model: Seq2Seq, manager: MathQAManager, datapoint: MathQADatapoint, device,
+                       return_error_type=False) -> bool:
     source_token_indices = datapoint.text_token_indices
     source_token_indices = tensorize_token_list(source_token_indices, device)
     generated_token_indices = model.generate(
@@ -72,7 +73,8 @@ def evaluate_datapoint(model: Seq2Seq, manager: MathQAManager, datapoint: MathQA
         end_of_string_token_index=manager.code_end_token_index,
         max_target_seq_len=manager.code_max_len,
     )
-    return manager.check_generated_code_correctness(generated_token_indices, datapoint)
+    return manager.check_generated_code_correctness(generated_token_indices, datapoint,
+                                                    return_error_type=return_error_type)
 
 
 def evaluate(model: Seq2Seq, manager: MathQAManager, partition: str, device,
@@ -153,8 +155,7 @@ def train(prefix: Path, model: Seq2Seq, mathqa_manager: MathQAManager, n_epochs:
     _logger.info(f"{prefix.name} training finished")
 
 
-def example():
-    import config
+def simple_example():
     manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True)
     model = Seq2Seq(
         source_vocabulary_size=manager.text_vocabulary_size,
@@ -162,6 +163,9 @@ def example():
         hidden_dim=32
     )
     train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=50)
+
+
+def macro_example():
     # macro example
     manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True,
                             macro_file=config.MACRO_10_FILE)
@@ -173,5 +177,17 @@ def example():
     train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=50)
 
 
+def no_punctuation_example():
+    manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True, no_punctuation=True)
+    model = Seq2Seq(
+        source_vocabulary_size=manager.text_vocabulary_size,
+        target_vocabulary_size=manager.code_vocabulary_size,
+        hidden_dim=32
+    )
+    train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=50)
+
+
 if __name__ == "__main__":
-    example()
+    simple_example()
+    # macro_example()
+    # no_punctuation_example()
