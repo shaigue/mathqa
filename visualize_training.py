@@ -49,3 +49,31 @@ plt.show()
 
 
 #%%
+logs = {}
+for i in range(1, 10, 2):
+    logs[i] = get_experiment_logs(f'macro_{i}')
+logs[10] = get_experiment_logs('macro_10')
+logs[0] = get_experiment_logs('vanilla')
+
+
+#%%
+def plot_for_different_macro_num(field: str, ylim=None):
+    plt.figure()
+    for num_macro, curr_logs in logs.items():
+        data = curr_logs[field]
+        x, y = get_x_y_from_logs(data)
+        plt.plot(x, y, label=f'macro={num_macro}')
+    plt.title(field)
+    if ylim:
+        plt.ylim(*ylim)
+    plt.legend()
+    plt.show()
+
+
+#%%
+# draw training loss plots
+plot_for_different_macro_num('epoch_loss')
+# draw training correctness plots
+plot_for_different_macro_num('train_correctness_rate', (0, 1))
+# draw dec correctness plots
+plot_for_different_macro_num('dev_correctness_rate', (0, 1))

@@ -178,7 +178,7 @@ def join_tokenized_linear_formula_no_punctuations(tokenized_linear_formula: list
     for token in tokenized_linear_formula:
         if is_arg(token):
             if last_type is None:
-                raise RuntimeError('should not start with argument')
+                pass  # raise RuntimeError('should not start with argument')
             elif last_type == 'arg':
                 linear_formula += ','
             elif last_type == 'op':

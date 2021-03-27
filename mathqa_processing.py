@@ -1,9 +1,9 @@
 """Processing methods for mathqa dataset"""
+from collections import defaultdict
+import math
+from enum import Enum
 from pathlib import Path
 from typing import Union, Iterator, Optional
-import math
-from collections import defaultdict
-from enum import Enum
 
 import numpy as np
 
@@ -15,6 +15,7 @@ from program_graph.macro_substitution import MacroData
 
 
 # TODO: add error types report during training
+# TODO: build the code vocabulary from known symbols, not from data
 
 class ErrorType(Enum):
     no_error = 0
@@ -22,7 +23,6 @@ class ErrorType(Enum):
     value = 2
 
 
-# TODO: build the code vocabulary from known symbols, not from data
 class MathQADatapoint:
     def __init__(self, text_token_indices: list[int], code_token_indices: list[int], extracted_numbers: list[int],
                  program: Program):
@@ -89,6 +89,12 @@ def _get_linear_formulas(processed_entries: dict[str, list[ProcessedMathQAEntry]
     return processed_problems
 
 
+class ErrorReport:
+    def __init__(self, error_type: ErrorType, generated_tokens: list[str]):
+        self.error_type = error_type
+        self.generated_tokens = generated_tokens
+
+
 class MathQAManager:
     partitions = ['train', 'dev', 'test']
 
@@ -114,6 +120,8 @@ class MathQAManager:
 
         train_processed_problems = _get_processed_problems(processed_entries, 'train')
         train_linear_formulas = _get_linear_formulas(processed_entries, 'train')
+
+        # if padding is stated then add text padding at the start
 
         self.text_vectorizer = TextVectorizer(train_processed_problems, max_vocabulary_size)
 
@@ -148,9 +156,19 @@ class MathQAManager:
         for i in indices:
             yield datapoints[i]
 
+    def get_datapoint(self, partition: str, index: int) -> MathQADatapoint:
+        return self.datapoints[partition][index]
+
+    def get_partition_length(self, partition: str) -> int:
+        return len(self.datapoints[partition])
+
     @property
     def text_vocabulary_size(self):
         return self.text_vectorizer.vocabulary_size
+
+    @property
+    def pad_index(self):
+        return self.code_vectorizer.pad_token_index
 
     @property
     def code_vocabulary_size(self):
@@ -168,10 +186,11 @@ class MathQAManager:
     def code_max_len(self):
         return self.code_vectorizer.max_sequence_len
 
-    def check_generated_code_correctness(self, code_token_indices: list[int], datapoint: MathQADatapoint,
-                                         return_error_type=False) -> Union[bool, ErrorType]:
+    def check_generated_code_correctness(self, code_token_indices: list[int],
+                                         datapoint: MathQADatapoint) -> ErrorReport:
+        generated_tokens = self.code_vectorizer.token_index_list_to_token_list(code_token_indices)
         try:
-            linear_formula = self.code_vectorizer.token_index_list_to_string(code_token_indices)
+            linear_formula = self.code_vectorizer.token_list_to_string(generated_tokens)
             program = Program.from_linear_formula(linear_formula)
             inputs = datapoint.extracted_numbers
             if self.macro_data is not None:
@@ -181,13 +200,12 @@ class MathQAManager:
             value = program.eval(inputs, macro_dict)
             target_value = datapoint.program.eval(inputs, macro_dict)
             correct = math.isclose(value, target_value)
-            if return_error_type:
-                return ErrorType.no_error if correct else ErrorType.value
-            return correct
+            if correct:
+                return ErrorReport(ErrorType.no_error, generated_tokens)
+            return ErrorReport(ErrorType.value, generated_tokens)
+
         except:
-            if return_error_type:
-                return ErrorType.syntax
-            return False
+            return ErrorReport(ErrorType.syntax, generated_tokens)
 
     def _get_datapoints(self, processed_entries: dict[str, list[ProcessedMathQAEntry]]) -> dict[str, list[MathQADatapoint]]:
         datapoints = defaultdict(list)
@@ -200,4 +218,5 @@ class MathQAManager:
                     program=entry.program
                 )
                 datapoints[part].append(datapoint)
+
         return datapoints

@@ -24,7 +24,7 @@ class TextVectorizer:
     special_tokens = [unknown_token, pad_token, end_of_sequence_token, start_of_sequence_token]
 
     def __init__(self, strings: Iterable[str], max_tokens: int = None,
-                 normalize_fn=default_normalize_fn, split_fn=default_split_fn, join_fn=default_join_fn):
+                 normalize_fn=default_normalize_fn, split_fn=default_split_fn, join_fn=default_join_fn,):
 
         assert split_fn is not None, "The split function cannot be None."
 
@@ -32,6 +32,7 @@ class TextVectorizer:
         self.normalize_fn = normalize_fn
         self.split_fn = split_fn
         self.join_fn = join_fn
+
 
         # create the mapping from tokens to indices
         counter = Counter()
@@ -91,9 +92,12 @@ class TextVectorizer:
             del token_list[-1]
         return token_list
 
-    def token_index_list_to_string(self, index_list: List[int]) -> str:
-        token_list = self.token_index_list_to_token_list(index_list)
+    def token_list_to_string(self, token_list: list[str]) -> str:
         return self.join_fn(token_list)
+
+    def token_index_list_to_string(self, index_list: list[int]) -> str:
+        token_list = self.token_index_list_to_token_list(index_list)
+        return self.token_list_to_string(token_list)
 
     @property
     def pad_token_index(self):

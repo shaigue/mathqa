@@ -2,10 +2,23 @@
 import config
 from mathqa_processing import MathQAManager
 from simple_seq2seq import Seq2Seq
-from train_mathqa import train
+from train_mathqa import train, get_manager, get_model
 
 _logger = config.get_logger(__file__)
 N_EPOCHS = 100
+
+
+def run_no_punc_experiment(num_macros: int):
+    macro_file = config.get_n_macro_file(num_macros)
+    manager = get_manager(macro_file=macro_file)
+    model = get_model(manager)
+    prefix = config.get_no_punc_exp_prefix(num_macros)
+    train(prefix=prefix, model=model, manager=manager, n_epochs=200, evaluate_every=10)
+
+
+def run_all_no_punc_experiments():
+    for n_macros in [0, 1, 5, 10]:
+        run_no_punc_experiment(n_macros)
 
 
 def train_mathqa_vanilla():
@@ -77,4 +90,5 @@ def different_number_of_macros():
 
 
 if __name__ == "__main__":
-    different_number_of_macros()
+    # different_number_of_macros()
+    run_all_no_punc_experiments()
