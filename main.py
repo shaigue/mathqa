@@ -22,8 +22,8 @@ def run_all_no_punc_experiments():
 
 
 def run_all_no_punc_experiments_converge():
-    for n_macros in [0, 1, 5, 10]:
-        run_multiple_macro_experiments(n_macros, 'converge_', n_epochs=1000)
+    for n_macros in [0, 5, 10]:
+        run_multiple_macro_experiments(n_macros, 'converge_', n_epochs=800)
 
 
 def train_mathqa_vanilla():
@@ -98,4 +98,3 @@ if __name__ == "__main__":
     # different_number_of_macros()
     # run_all_no_punc_experiments()
     run_all_no_punc_experiments_converge()
-    
