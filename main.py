@@ -8,17 +8,22 @@ _logger = config.get_logger(__file__)
 N_EPOCHS = 100
 
 
-def run_no_punc_experiment(num_macros: int):
+def run_multiple_macro_experiments(num_macros: int, prefix='', n_epochs=200):
     macro_file = config.get_n_macro_file(num_macros)
     manager = get_manager(macro_file=macro_file)
     model = get_model(manager)
-    prefix = config.get_no_punc_exp_prefix(num_macros)
-    train(prefix=prefix, model=model, manager=manager, n_epochs=200, evaluate_every=10)
+    prefix = config.get_exp_prefix(num_macros, prefix)
+    train(prefix=prefix, model=model, manager=manager, n_epochs=n_epochs, evaluate_every=10)
 
 
 def run_all_no_punc_experiments():
     for n_macros in [0, 1, 5, 10]:
-        run_no_punc_experiment(n_macros)
+        run_multiple_macro_experiments(n_macros, 'no_punc_')
+
+
+def run_all_no_punc_experiments_converge():
+    for n_macros in [0, 1, 5, 10]:
+        run_multiple_macro_experiments(n_macros, 'converge_', n_epochs=1000)
 
 
 def train_mathqa_vanilla():
@@ -91,4 +96,6 @@ def different_number_of_macros():
 
 if __name__ == "__main__":
     # different_number_of_macros()
-    run_all_no_punc_experiments()
+    # run_all_no_punc_experiments()
+    run_all_no_punc_experiments_converge()
+    

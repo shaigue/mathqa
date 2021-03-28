@@ -106,7 +106,8 @@ def convert_error_report_json(er: ErrorReport) -> dict:
 
 
 def train(prefix: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int = 10, evaluate_every: int = 5,
-          logs_file=None, checkpoint_file=None, batch_size=32, lr=0.01, weight_decay=1e-4):
+          logs_file=None, checkpoint_file=None, batch_size=32, lr=0.01, weight_decay=1e-4,
+          lr_decay_factor=0.2, lr_patience=1):
     if logs_file is None:
         logs_file = prefix / 'train_log.json'
     if checkpoint_file is None:
@@ -117,8 +118,8 @@ def train(prefix: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int = 
     train_loader = get_train_loader(manager, device, batch_size)
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=2, verbose=True,
-                                                              factor=0.5)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=lr_patience, verbose=True,
+                                                              factor=lr_decay_factor)
 
     best_dev_correctness_rate = 0
     logs = defaultdict(list)

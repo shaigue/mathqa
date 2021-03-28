@@ -30,12 +30,12 @@ def get_n_macro_file(n_macros: int) -> Path:
     return MACRO_DIR / f"{n_macros}.pkl"
 
 
-def get_no_punc_exp_name(n_macros: int) -> str:
-    return f"no_punc_macro_{n_macros}"
+def get_exp_name(n_macros: int) -> str:
+    return f"macro_{n_macros}"
 
 
-def get_no_punc_exp_prefix(n_macros: int) -> Path:
-    return TRAINING_LOGS_DIR / get_no_punc_exp_name(n_macros)
+def get_exp_prefix(n_macros: int, prefix='') -> Path:
+    return TRAINING_LOGS_DIR / (prefix + get_exp_name(n_macros))
 
 
 
