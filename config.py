@@ -22,6 +22,9 @@ LOGS_DIR = ROOT_DIR / 'logs'
 # TODO: move here other naming conventions in the code
 # TODO: enable checkpoint loading if training was interrupted in the middle
 
+# TODO: try to build a encoder - decoder with copy mechanism + works by considering the relative inputs
+#  + the hidden states of past created node.
+
 
 def get_n_macro_file(n_macros: int) -> Path:
     assert n_macros in [0, 1, 3, 5, 7, 9, 10], "Does not exist"
