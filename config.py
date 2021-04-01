@@ -37,9 +37,12 @@ def get_exp_name(n_macros: int) -> str:
     return f"macro_{n_macros}"
 
 
-def get_exp_prefix(n_macros: int, prefix='') -> Path:
+def get_macro_prefix(n_macros: int, prefix='') -> Path:
     return TRAINING_LOGS_DIR / (prefix + get_exp_name(n_macros))
 
+
+def get_experiment_dir_path(exp_name: str) -> Path:
+    return TRAINING_LOGS_DIR / exp_name
 
 
 def get_log_file(module_name: str):

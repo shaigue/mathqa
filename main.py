@@ -8,11 +8,23 @@ _logger = config.get_logger(__file__)
 N_EPOCHS = 100
 
 
+def run_dropout_2_gru_layer_experiment():
+    n_epochs = 300
+    for n_macros in [0, 10]:
+        macro_file = config.get_n_macro_file(n_macros)
+        manager = get_manager(macro_file=macro_file)
+        for dropout, layers in [(0.2, 1), (0, 2), (0.2, 2)]:
+            model = get_model(manager, dropout, layers)
+            exp_name = f"macro_{n_macros}_dropout_{dropout}_layers_{layers}"
+            exp_dir = config.get_experiment_dir_path(exp_name)
+            train(prefix=exp_dir, model=model, manager=manager, n_epochs=n_epochs)
+
+
 def run_multiple_macro_experiments(num_macros: int, prefix='', n_epochs=200):
     macro_file = config.get_n_macro_file(num_macros)
     manager = get_manager(macro_file=macro_file)
     model = get_model(manager)
-    prefix = config.get_exp_prefix(num_macros, prefix)
+    prefix = config.get_macro_prefix(num_macros, prefix)
     train(prefix=prefix, model=model, manager=manager, n_epochs=n_epochs, evaluate_every=10)
 
 
@@ -95,6 +107,4 @@ def different_number_of_macros():
 
 
 if __name__ == "__main__":
-    # different_number_of_macros()
-    # run_all_no_punc_experiments()
-    run_all_no_punc_experiments_converge()
+    run_dropout_2_gru_layer_experiment()

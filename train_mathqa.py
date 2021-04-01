@@ -171,13 +171,14 @@ def get_manager(no_punctuation: bool = True, macro_file=None, dummy=False, ):
     )
 
 
-def get_model(manager: MathQAManager):
+def get_model(manager: MathQAManager, dropout: float = 0, n_gru_layers: int = 1):
     return Seq2Seq(
         source_vocabulary_size=manager.text_vocabulary_size,
         target_vocabulary_size=manager.code_vocabulary_size,
         hidden_dim=config.INTERNAL_DIM,
         pad_index=manager.pad_index,
-        dropout=0,
+        dropout=dropout,
+        n_gru_layers=n_gru_layers,
     )
 
 
