@@ -8,5 +8,6 @@ slurm*
 !macros/*
 training_logs/model.pt
 training_logs/train_log.json
+training_logs/error_report.json
 *.log
 *_example.py

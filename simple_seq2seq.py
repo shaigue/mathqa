@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
 
@@ -29,7 +30,6 @@ class Encoder(nn.Module):
 
     def forward(self, source_tokens, source_lens=None, prev_hidden_state=None):
         seq_len, batch_size = source_tokens.shape
-        assert source_lens is not None or batch_size == 1, "source_lens can be None only if batch_size is 1"
 
         if prev_hidden_state is None:
             prev_hidden_state = self._initial_hidden_state(batch_size)
@@ -66,7 +66,6 @@ class Decoder(nn.Module):
 
     def forward(self, target_tokens, encoder_last_hidden, target_lens=None):
         seq_len, batch_size = target_tokens.shape
-        assert target_lens is not None or batch_size == 1, "if target_len is None, then batch_size has to be 1."
 
         embedding = self.embedding_layer(target_tokens)
 
@@ -88,10 +87,11 @@ class Seq2Seq(nn.Module):
     def __init__(self, source_vocabulary_size: int, target_vocabulary_size: int, hidden_dim: int,
                  pad_index: int, dropout: float = 0.0, n_gru_layers: int = 1):
         super(Seq2Seq, self).__init__()
-        self.source_vocabulary_size = source_vocabulary_size
-        self.target_vocabulary_size = target_vocabulary_size
+        self.source_vocab_size = source_vocabulary_size
+        self.target_vocab_size = target_vocabulary_size
         self.hidden_dim = hidden_dim
         self.pad_index = pad_index
+        self.n_gru_layers = n_gru_layers
 
         self.encoder = Encoder(source_vocabulary_size, hidden_dim, dropout=dropout,
                                pad_index=pad_index, n_gru_layers=n_gru_layers)
@@ -105,29 +105,65 @@ class Seq2Seq(nn.Module):
         decoder_output, decoder_last_hidden_state = self.decoder(target_tokens, encoder_last_hidden_state, target_lens)
         return decoder_output
 
-    def generate(self, source_token_indices, start_of_string_token_index: int, end_of_string_token_index: int,
-                 max_target_seq_len: int):
-        seq_len, batch_size = source_token_indices.shape
-        # TODO: think how to remove this by supporting masking
-        assert batch_size == 1, f"on generation input sequences should be 1, got {batch_size}"
+    def _beam_search_decode(self, source_tokens, source_lens, start_of_sequence_token: int, end_of_sequence_token: int,
+                            max_target_seq_len: int, beam_size: int = 1):
+        # TODO: support batched beam search decoding
+        pass
 
-        encoder_output, encoder_last_hidden_state = self.encoder(source_token_indices)
-        decoder_last_hidden_state = encoder_last_hidden_state
-        next_decoder_input = torch.tensor(start_of_string_token_index, device=get_module_device(self)).view(1, 1)
-        generated = []
+    def _greedy_decode(self, source_tokens, source_lens, start_of_sequence_token: int, end_of_sequence_token: int,
+                       max_target_seq_len: int):
+        seq_len, batch_size = source_tokens.shape
+        assert len(source_lens) == batch_size
 
+        encoder_out, encoder_hidden = self.encoder(source_tokens, source_lens)
+        # assert encoder_out.shape == (seq_len, batch_size, self.hidden_dim)
+        assert encoder_hidden.shape == (self.n_gru_layers, batch_size, self.hidden_dim)
+
+        decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,
+                             device=get_module_device(self))
+
+        # this tells us what batch corresponds to each entry in decoded.
+        # will change when <EOS> will be emitted
+        batch_mapping = torch.arange(batch_size)
+        decoder_hidden = encoder_hidden
+        decoder_input = torch.full(size=(1, batch_size), fill_value=start_of_sequence_token,
+                                   device=get_module_device(self))
+        n_active = batch_size
         for i in range(max_target_seq_len):
-            # decoder_output.shape = (1, 1, target_vocabulary_size)
-            decoder_output, decoder_last_hidden_state = self.decoder(next_decoder_input, decoder_last_hidden_state)
-            decoder_output = decoder_output.view(self.target_vocabulary_size)
-            next_token = torch.argmax(decoder_output)
-            if next_token == end_of_string_token_index:
-                break
-            # will not add the end-of-sequence and start-of-sequence tokens to the string
-            generated.append(next_token.detach().cpu().item())
-            next_decoder_input = next_token.view(1, 1)
+            decoder_out, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
+            assert decoder_out.shape == (1, n_active, self.target_vocab_size)
+            assert decoder_hidden.shape == (self.n_gru_layers, n_active, self.hidden_dim)
 
-        return generated
+            # insert the next tokens to the decoded list
+            decoder_out = decoder_out.view(n_active, self.target_vocab_size)
+            next_tokens = torch.argmax(decoder_out, dim=1)
+            decoded[batch_mapping, i] = next_tokens
+
+            # find out what tokens are end-of-sequence
+            end_of_sequence_mask = (next_tokens != end_of_sequence_token)
+            n_active = end_of_sequence_mask.sum().item()
+            if n_active == 0:
+                break
+            batch_mapping = batch_mapping[end_of_sequence_mask]
+            decoder_hidden = decoder_hidden[:, end_of_sequence_mask]
+            decoder_input = next_tokens[end_of_sequence_mask].view(1, -1)
+
+        # convert to a list of lists
+        decoded_list = []
+        for i in range(batch_size):
+            mask = decoded[i] != self.pad_index
+            decoded_list.append(decoded[i, mask].tolist())
+
+        return decoded_list
+
+    def generate(self, source_tokens, source_lens, start_of_sequence_token: int, end_of_sequence_token: int,
+                 max_target_seq_len: int, beam_size: int = 1):
+        if beam_size == 1:
+            return self._greedy_decode(source_tokens, source_lens, start_of_sequence_token, end_of_sequence_token,
+                                       max_target_seq_len)
+        else:
+            return self._beam_search_decode(source_tokens, source_lens, start_of_sequence_token, end_of_sequence_token,
+                                            max_target_seq_len, beam_size)
 
 
 def example():
@@ -180,14 +216,13 @@ def example():
     output = model(padded_source, padded_targets, source_lens, target_lens)
 
     # generate text with the model
-    source_to_generate = source_sequences[3].view(-1, 1)
     generated = model.generate(
-        source_token_indices=source_to_generate,
-        start_of_string_token_index=1,
-        end_of_string_token_index=2,
-        max_target_seq_len=max_seq_len
+        padded_source, source_lens,
+        start_of_sequence_token=1,
+        end_of_sequence_token=2,
+        max_target_seq_len=max_seq_len,
+        beam_size=1
     )
-
     print(f"generated sequence\n{generated}")
 
 

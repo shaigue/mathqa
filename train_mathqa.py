@@ -1,5 +1,4 @@
 """This is a code to train a sequence to sequence model with teacher forcing"""
-from collections import defaultdict
 import json
 from pathlib import Path
 from typing import Union
@@ -8,15 +7,58 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
-from mathqa_processing import MathQAManager, MathQADatapoint, ErrorReport, ErrorType
-from mathqa_torch_loader import get_train_loader
-from simple_seq2seq import Seq2Seq
 import config
+from mathqa_processing import MathQAManager, ErrorReport, ErrorType
+from mathqa_torch_loader import get_loader, TrainBatch, EvalBatch
+from simple_seq2seq import Seq2Seq
 
-_logger = config.get_logger(__file__, mode='a')
+_logger = config.get_logger(__file__)
 
 
-def teacher_forcing_loss(target_token_indices, predicted_target_token_logits, pad_index: int):
+class TrainLogs:
+    def __init__(self, partitions: list[str], metrics: list[str]):
+        self.metrics = metrics
+        self.partitions = partitions
+        self.logs = {}
+        # initialize empty dicts
+        for part in partitions:
+            self.logs[part] = {}
+            for metric in metrics:
+                self.logs[part][metric] = {}
+
+    def update(self, partition: str, metric: str, epoch: int, value: float):
+        assert partition in self.partitions
+        assert metric in self.metrics
+        assert epoch >= 0
+        self.logs[partition][metric][epoch] = value
+
+    def get(self, partition: str, metric: str, epoch: int) -> float:
+        assert partition in self.partitions
+        assert metric in self.metrics
+        assert epoch >= 0
+        return self.logs[partition][metric][epoch]
+
+    def to_json(self, json_path: Path):
+        with json_path.open('w') as f:
+            json.dump(self.logs, f)
+
+    @classmethod
+    def from_json(cls, json_path: Path):
+        with json_path.open('r') as f:
+            logs: dict = json.load(f)
+        # need to convert string epoch to int
+        partitions = list(logs.keys())
+        metrics = list(logs[partitions[0]].keys())
+        new_logs = cls(partitions, metrics)
+        for part, part_dict in logs.items():
+            for metric, metric_dict in part_dict.items():
+                for str_epoch, value in metric_dict.items():
+                    int_epoch = int(str_epoch)
+                    new_logs.update(part, metric, int_epoch, value)
+        return new_logs
+
+
+def teacher_forcing_loss(target_token_indices, predicted_target_token_logits, pad_index: int) -> torch.Tensor:
     seq_len, batch_size, target_vocabulary_size = predicted_target_token_logits.shape
     assert target_token_indices.shape == (seq_len, batch_size)
     # drop the first target symbol <SOS>
@@ -29,30 +71,34 @@ def teacher_forcing_loss(target_token_indices, predicted_target_token_logits, pa
     return F.cross_entropy(predicted_target_token_logits, target_token_indices, ignore_index=pad_index)
 
 
-def tensorize_token_list(token_list: list[int], device):
-    return torch.tensor(token_list, dtype=torch.int64, device=device).view(-1, 1)
-
-
-def train_batch(model: Seq2Seq, optimizer: torch.optim.Optimizer, batch):
+def train_batch(model: Seq2Seq, optimizer: torch.optim.Optimizer, batch: TrainBatch) -> float:
     optimizer.zero_grad()
 
-    source_tokens, target_tokens, source_lens, target_lens = batch
-    predicted_target_token_logits = model(source_tokens, target_tokens, source_lens, target_lens)
+    predicted_target_token_logits = model(
+        source_tokens=batch.text_tokens,
+        target_tokens=batch.code_tokens,
+        source_lens=batch.text_lens,
+        target_lens=batch.code_lens
+    )
 
-    loss = teacher_forcing_loss(target_tokens, predicted_target_token_logits, model.pad_index)
+    loss = teacher_forcing_loss(
+        target_token_indices=batch.code_tokens,
+        predicted_target_token_logits=predicted_target_token_logits,
+        pad_index=model.pad_index
+    )
 
     loss.backward()
     optimizer.step()
 
-    return loss.detach().cpu().item()
+    return loss.item()
 
 
-def train_epoch(model: Seq2Seq, optimizer: torch.optim.Optimizer, train_loader: DataLoader):
+def train_epoch(model: Seq2Seq, optimizer: torch.optim.Optimizer, train_loader: DataLoader) -> float:
     model.train()
     total_loss = 0
     n_batches = 0
 
-    for datapoint_index, batch in enumerate(train_loader):
+    for batch in train_loader:
         batch_loss = train_batch(model, optimizer, batch)
         total_loss += batch_loss
         n_batches += 1
@@ -61,39 +107,50 @@ def train_epoch(model: Seq2Seq, optimizer: torch.optim.Optimizer, train_loader: 
     return avg_loss
 
 
-def evaluate_datapoint(model: Seq2Seq, manager: MathQAManager, datapoint: MathQADatapoint,
-                       device) -> ErrorReport:
-    source_token_indices = datapoint.text_token_indices
-    source_token_indices = tensorize_token_list(source_token_indices, device)
-    generated_token_indices = model.generate(
-        source_token_indices,
-        start_of_string_token_index=manager.code_start_token_index,
-        end_of_string_token_index=manager.code_end_token_index,
+def evaluate_batch(model: Seq2Seq, manager: MathQAManager, batch: EvalBatch,
+                   beam_size: int = 1) -> list[ErrorReport]:
+
+    generated = model.generate(
+        source_tokens=batch.text_tokens,
+        source_lens=batch.text_lens,
+        start_of_sequence_token=manager.code_start_token_index,
+        end_of_sequence_token=manager.code_end_token_index,
         max_target_seq_len=manager.code_max_len,
+        beam_size=beam_size
     )
-    return manager.check_generated_code_correctness(generated_token_indices, datapoint)
+    error_reports = []
+    for i in range(len(generated)):
+        error_report = manager.get_error_report(
+            generated=generated[i],
+            inputs=batch.inputs[i],
+            correct_answer=batch.answers[i],
+        )
+        error_reports.append(error_report)
+
+    return error_reports
 
 
-def evaluate(model: Seq2Seq, manager: MathQAManager, partition: str, device,
-             return_per_sample=False) -> Union[float, tuple[float, list[ErrorReport]]]:
+def evaluate(model: Seq2Seq, manager: MathQAManager, loader: DataLoader, return_per_sample=False,
+             beam_size: int = 1) -> Union[float, tuple[float, list[ErrorReport]]]:
     model.eval()
-    total_correct = 0
-    n_batches = 0
+    n_correct = 0
+    n_samples = 0
     if return_per_sample:
         per_sample = []
 
     with torch.no_grad():
-        for datapoint_index, datapoint in enumerate(manager.iter_dataset(partition, shuffle=False)):
-            error_report = evaluate_datapoint(model, manager, datapoint, device)
-            correct = error_report.error_type == ErrorType.no_error
-            if correct:
-                total_correct += 1
-            n_batches += 1
+        for batch in loader:
+            error_reports = evaluate_batch(model, manager, batch, beam_size)
+            n_samples += len(error_reports)
+
+            for er in error_reports:
+                if er.error_type == ErrorType.no_error:
+                    n_correct += 1
 
             if return_per_sample:
-                per_sample.append(error_report)
+                per_sample += error_reports
 
-    correctness_rate = total_correct / n_batches
+    correctness_rate = n_correct / n_samples
 
     if return_per_sample:
         return correctness_rate, per_sample
@@ -105,41 +162,52 @@ def convert_error_report_json(er: ErrorReport) -> dict:
     return {'error_type': er.error_type.name, 'generated_tokens': er.generated_tokens}
 
 
-def train(prefix: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int = 10, evaluate_every: int = 5,
-          logs_file=None, checkpoint_file=None, batch_size=32, lr=0.01, weight_decay=1e-4,
-          lr_decay_factor=0.2, lr_patience=1):
-    if logs_file is None:
-        logs_file = prefix / 'train_log.json'
-    if checkpoint_file is None:
-        checkpoint_file = prefix / 'model.pt'
+def train(dir_path: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int,
+          evaluate_every=5, batch_size=32, lr=0.01, weight_decay=1e-4,
+          lr_decay_factor=0.2, lr_patience=1, beam_size=1):
 
-    prefix.mkdir(parents=True, exist_ok=True)
+    # set up the logs files
+    dir_path.mkdir(parents=True, exist_ok=True)
+    logs_file = dir_path / 'train_log.json'
+    error_reports_file = dir_path / 'error_report.json'
+    checkpoint_file = dir_path / 'model.pt'
+
+    # decide on what device to use and move the model there
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    train_loader = get_train_loader(manager, device, batch_size)
     model = model.to(device)
+
+    # set up the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=lr_patience, verbose=True,
-                                                              factor=lr_decay_factor)
+    lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', patience=lr_patience,
+                                                              verbose=True, factor=lr_decay_factor)
+    # prepare the data
+    train_loader = get_loader(manager, device, 'train', train=True)
+    eval_loaders = {
+        part: get_loader(manager, device, part, train=False)
+        for part in manager.partitions
+    }
 
+    # set up logging
     best_dev_correctness_rate = 0
-    logs = defaultdict(list)
-    _logger.info(f"using device={device}. starting training session {prefix.name}.")
-    for epoch_index in range(n_epochs):
-        epoch_loss = train_epoch(model, optimizer, train_loader)
-        _logger.info(f"epoch={epoch_index}, loss={epoch_loss}")
+    logs = TrainLogs(partitions=['train', 'dev', 'test'], metrics=['correctness_rate', 'loss'])
+    _logger.info(f"using device={device}. starting training session {dir_path.name}.")
 
-        logs['epoch_loss'].append({'epoch': epoch_index, 'value': epoch_loss})
+    for epoch_index in range(n_epochs):
+        mean_loss = train_epoch(model, optimizer, train_loader)
+
+        _logger.info(f"epoch={epoch_index}, mean_loss={mean_loss}")
+        logs.update('train', 'loss', epoch_index, mean_loss)
 
         # checkpoint - save only the best performing model on dev
         if (epoch_index + 1) % evaluate_every == 0 or epoch_index == n_epochs - 1:
-            train_correctness_rate = evaluate(model, manager, 'train', device)
-            dev_correctness_rate = evaluate(model, manager, 'dev', device)
-            _logger.info(f"train_correctness_rate={train_correctness_rate}")
-            _logger.info(f"dev_correctness_rate={dev_correctness_rate}")
+            for part in ['train', 'dev']:
+                correctness_rate = evaluate(model, manager, eval_loaders[part], beam_size=beam_size)
 
-            logs['train_correctness_rate'].append({'epoch': epoch_index, 'value': train_correctness_rate})
-            logs['dev_correctness_rate'].append({'epoch': epoch_index, 'value': dev_correctness_rate})
+                _logger.info(f"{part}_correctness_rate={correctness_rate}")
+                logs.update(part, 'correctness_rate', epoch_index, correctness_rate)
+
             # check if to save the model
+            dev_correctness_rate = logs.get('dev', 'correctness_rate', epoch_index)
             if dev_correctness_rate > best_dev_correctness_rate:
                 _logger.info(f"saving best model checkpoint at epoch={epoch_index}")
                 torch.save(model.state_dict(), checkpoint_file)
@@ -150,18 +218,28 @@ def train(prefix: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int = 
     # make sure to load the best performing model on dev
     model.load_state_dict(torch.load(checkpoint_file))
     # evaluate on each one of the partitions, and save their correctness rate and per_sample correctness in the logs
+    partitions_error_reports = {}
     for part in manager.partitions:
-        correctness_rate, per_sample = evaluate(model, manager, part, device, return_per_sample=True)
+        correctness_rate, error_reports = evaluate(
+            model,
+            manager,
+            eval_loaders[part],
+            return_per_sample=True,
+            beam_size=beam_size
+        )
         _logger.info(f"{part}_correctness_rate={correctness_rate}")
-        logs[f'{part}_correctness_rate'].append({'epoch': n_epochs, 'value': correctness_rate})
-        logs[f'{part}_per_sample_report'] = list(map(convert_error_report_json, per_sample))
+        logs.update(part, 'correctness_rate', n_epochs, correctness_rate)
+        partitions_error_reports[part] = list(map(convert_error_report_json, error_reports))
+
     # save logs
-    with open(logs_file, 'w') as f:
-        json.dump(logs, f)
-    _logger.info(f"{prefix.name} training finished")
+    logs.to_json(logs_file)
+    with error_reports_file.open('w') as f:
+        json.dump(partitions_error_reports, f)
+
+    _logger.info(f"{dir_path.name} training finished")
 
 
-def get_manager(no_punctuation: bool = True, macro_file=None, dummy=False, ):
+def get_manager(no_punctuation: bool = True, macro_file=None, dummy=False):
     return MathQAManager(
         root_dir=config.MATHQA_DIR,
         max_vocabulary_size=config.MAX_VOCABULARY_SIZE,
@@ -182,43 +260,18 @@ def get_model(manager: MathQAManager, dropout: float = 0, n_gru_layers: int = 1)
     )
 
 
-def simple_example():
-    manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True)
-    model = Seq2Seq(
-        source_vocabulary_size=manager.text_vocabulary_size,
-        target_vocabulary_size=manager.code_vocabulary_size,
-        hidden_dim=32,
-        pad_index=manager.pad_index
-    )
-    train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=50)
+def example():
+    manager = get_manager(dummy=True)
+    model = get_model(manager)
+    train(config.TRAINING_LOGS_DIR, model, manager, 100)
 
 
 def macro_example():
-    # macro example
-    manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True,
-                            macro_file=config.MACRO_10_FILE)
-    model = Seq2Seq(
-        source_vocabulary_size=manager.text_vocabulary_size,
-        target_vocabulary_size=manager.code_vocabulary_size,
-        hidden_dim=32,
-        pad_index=manager.pad_index
-    )
-    train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=50)
-
-
-def no_punctuation_example():
-    manager = MathQAManager(root_dir=config.MATHQA_DIR, max_vocabulary_size=1000, dummy=True,
-                            no_punctuation=True, macro_file=config.MACRO_10_FILE)
-    model = Seq2Seq(
-        source_vocabulary_size=manager.text_vocabulary_size,
-        target_vocabulary_size=manager.code_vocabulary_size,
-        hidden_dim=32,
-        pad_index=manager.pad_index
-    )
-    train(config.TRAINING_LOGS_DIR, model, manager, n_epochs=500, evaluate_every=20)
+    manager = get_manager(macro_file=config.MACRO_10_FILE, dummy=True)
+    model = get_model(manager)
+    train(config.TRAINING_LOGS_DIR, model, manager, 100)
 
 
 if __name__ == "__main__":
-    # simple_example()
-    # macro_example()
-    no_punctuation_example()
+    # example()
+    macro_example()

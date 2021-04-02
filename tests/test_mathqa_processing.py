@@ -4,6 +4,8 @@ import itertools
 from mathqa_processing import MathQAManager
 import config
 
+# TODO: do thorough checks before submitting the paper
+
 
 class TestMathQAProcessing(unittest.TestCase):
     def test_initialization(self):
@@ -33,7 +35,6 @@ class TestMathQAProcessing(unittest.TestCase):
                     self.assertEqual(len(entry), n)
 
     def test_check_correctness(self):
-        # TODO: implement
         pass
 
 

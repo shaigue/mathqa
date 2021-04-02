@@ -14,8 +14,9 @@ from program_graph.program import Program
 from program_graph.macro_substitution import MacroData
 
 
-# TODO: add error types report during training
 # TODO: build the code vocabulary from known symbols, not from data
+Number = Union[int, float]
+
 
 class ErrorType(Enum):
     no_error = 0
@@ -25,11 +26,12 @@ class ErrorType(Enum):
 
 class MathQADatapoint:
     def __init__(self, text_token_indices: list[int], code_token_indices: list[int], extracted_numbers: list[int],
-                 program: Program):
+                 program: Program, evaluated_result: Number):
         self.text_token_indices = text_token_indices
         self.code_token_indices = code_token_indices
         self.extracted_numbers = extracted_numbers
         self.program = program
+        self.evaluated_result = evaluated_result
 
 
 class ProcessedMathQAEntry:
@@ -103,8 +105,10 @@ class MathQAManager:
         self.dummy = dummy
 
         self.macro_data = None
+        self.macro_dict = None
         if macro_file is not None:
             self.macro_data = MacroData.from_file(macro_file)
+            self.macro_dict = self.macro_data.macro_dict
 
         raw_entries = {}
         for partition in self.partitions:
@@ -138,24 +142,6 @@ class MathQAManager:
 
         self.datapoints = self._get_datapoints(processed_entries)
 
-    def iter_dataset(self, partition: Union[str, list[str]], shuffle=False) -> Iterator[MathQADatapoint]:
-        """If it is a list of strings, then concatenate the partitions"""
-        if isinstance(partition, str):
-            partition = [partition]
-
-        datapoints = []
-        for part in partition:
-            datapoints += self.datapoints[part]
-
-        n_samples = len(datapoints)
-        indices = np.arange(n_samples)
-        if shuffle:
-            rng = np.random.default_rng()
-            rng.shuffle(indices)
-
-        for i in indices:
-            yield datapoints[i]
-
     def get_datapoint(self, partition: str, index: int) -> MathQADatapoint:
         return self.datapoints[partition][index]
 
@@ -186,36 +172,31 @@ class MathQAManager:
     def code_max_len(self):
         return self.code_vectorizer.max_sequence_len
 
-    def check_generated_code_correctness(self, code_token_indices: list[int],
-                                         datapoint: MathQADatapoint) -> ErrorReport:
-        generated_tokens = self.code_vectorizer.token_index_list_to_token_list(code_token_indices)
+    def get_error_report(self, generated: list[int], inputs: list[Number], correct_answer: Number) -> ErrorReport:
+        generated = self.code_vectorizer.token_index_list_to_token_list(generated)
         try:
-            linear_formula = self.code_vectorizer.token_list_to_string(generated_tokens)
+            linear_formula = self.code_vectorizer.token_list_to_string(generated)
             program = Program.from_linear_formula(linear_formula)
-            inputs = datapoint.extracted_numbers
-            if self.macro_data is not None:
-                macro_dict = self.macro_data.macro_dict
-            else:
-                macro_dict = None
-            value = program.eval(inputs, macro_dict)
-            target_value = datapoint.program.eval(inputs, macro_dict)
-            correct = math.isclose(value, target_value)
+            value = program.eval(inputs, self.macro_dict)
+            correct = math.isclose(value, correct_answer)
             if correct:
-                return ErrorReport(ErrorType.no_error, generated_tokens)
-            return ErrorReport(ErrorType.value, generated_tokens)
+                return ErrorReport(ErrorType.no_error, generated)
+            return ErrorReport(ErrorType.value, generated)
 
         except:
-            return ErrorReport(ErrorType.syntax, generated_tokens)
+            return ErrorReport(ErrorType.syntax, generated)
 
     def _get_datapoints(self, processed_entries: dict[str, list[ProcessedMathQAEntry]]) -> dict[str, list[MathQADatapoint]]:
         datapoints = defaultdict(list)
         for part, entries in processed_entries.items():
             for entry in entries:
+                evaluated_result = entry.program.eval(entry.extracted_numbers, macro_dict=self.macro_dict)
                 datapoint = MathQADatapoint(
                     text_token_indices=self.text_vectorizer.string_to_token_index_list(entry.processed_problem),
                     code_token_indices=self.code_vectorizer.string_to_token_index_list(entry.linear_formula),
                     extracted_numbers=entry.extracted_numbers,
-                    program=entry.program
+                    program=entry.program,
+                    evaluated_result=evaluated_result,
                 )
                 datapoints[part].append(datapoint)
 

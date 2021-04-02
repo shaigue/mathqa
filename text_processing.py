@@ -14,7 +14,6 @@ def default_join_fn(s: list[str]) -> str:
     return ' '.join(s)
 
 
-# TODO: add the ability to state in advance all the tokens, without reading them from data
 class TextVectorizer:
     pad_token = '<PAD>'
     unknown_token = '<UNK>'

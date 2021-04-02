@@ -17,7 +17,7 @@ def run_dropout_2_gru_layer_experiment():
             model = get_model(manager, dropout, layers)
             exp_name = f"macro_{n_macros}_dropout_{dropout}_layers_{layers}"
             exp_dir = config.get_experiment_dir_path(exp_name)
-            train(prefix=exp_dir, model=model, manager=manager, n_epochs=n_epochs)
+            train(dir_path=exp_dir, model=model, manager=manager, n_epochs=n_epochs)
 
 
 def run_multiple_macro_experiments(num_macros: int, prefix='', n_epochs=200):
@@ -25,7 +25,7 @@ def run_multiple_macro_experiments(num_macros: int, prefix='', n_epochs=200):
     manager = get_manager(macro_file=macro_file)
     model = get_model(manager)
     prefix = config.get_macro_prefix(num_macros, prefix)
-    train(prefix=prefix, model=model, manager=manager, n_epochs=n_epochs, evaluate_every=10)
+    train(dir_path=prefix, model=model, manager=manager, n_epochs=n_epochs, evaluate_every=10)
 
 
 def run_all_no_punc_experiments():
