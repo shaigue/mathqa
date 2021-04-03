@@ -167,8 +167,8 @@ def save_macro_extraction(extracted_macros: list[Program], modified_programs: li
 
 def load_macro_extraction(file: Path) -> tuple[list[Program], list[Program]]:
     """The output is first the list macros"""
-    with open(file, 'rb') as f:
-        data = pickle.load(f)
+    with open(file, 'r') as f:
+        data = json.load(f)
 
     extracted_macros = [Program.from_linear_formula(macro) for macro in data['extracted_macros']]
     modified_programs = [Program.from_linear_formula(program) for program in data['modified_programs']]

@@ -1,85 +1,80 @@
-"""This is a script for exploring the errors that different models make."""
+"""This script is for analyzing errors of the model"""
+
+import config
 
 
 #%%
-# lets look at some samples in "train" that 10 macros got it and 0 macros didn't
-entry1 = 10
-entry2 = 0
-part = 'train'
-field = f'{part}_per_sample_report'
-reports1 = logs[entry1][field]
-reports2 = logs[entry2][field]
+from mathqa_processing import MathQAManager
+
+exp_no_macro_name = 'converge_macro_0'
+exp_yes_macro_name = 'converge_macro_10'
 
 
 #%%
-# how much of each was value errors and how much was syntax error
-def syntax_value_error_analysis(reports: list[dict]) -> tuple[float, float]:
-    n_syntax, n_value = 0, 0
-    for rep in reports:
-        error_type = rep['error_type']
-        if error_type == 'syntax':
-            n_syntax += 1
-        if error_type == 'value':
-            n_value += 1
-    total_error = n_syntax + n_value
-    p_syntax = n_syntax / total_error
-    p_value = n_value / total_error
-    return p_syntax, p_value
+logs_no_macro = config.get_experiment_logs(exp_no_macro_name)
+logs_yes_macro = config.get_experiment_logs(exp_yes_macro_name)
 
 
 #%%
-p_syntax1, p_value1 = syntax_value_error_analysis(reports1)
-p_syntax2, p_value2 = syntax_value_error_analysis(reports2)
-print(f"{entry1} syntax={p_syntax1}, value={p_value1}")
-print(f"{entry2} syntax={p_syntax2}, value={p_value2}")
+# lets look at the dev errors
+no_macro_dev_error_reports = logs_no_macro['dev_per_sample_report']
+yes_macro_dev_error_reports = logs_yes_macro['dev_per_sample_report']
 
 
 #%%
-# find places where entry1 succeeded and entry2 failed
-succ1_fail2 = {}
-for i in range(len(reports1)):
-    rep1 = reports1[i]
-    rep2 = reports2[i]
-    print(rep1, rep2)
-    error1 = rep1['error_type'] != 'no_error'
-    error2 = rep2['error_type'] != 'no_error'
-    if not error1 and error2:
-        succ1_fail2[i] = {'rep1': rep1, 'rep2': rep2}
-
-print(succ1_fail2)
-#%%
-fail_reports = [rep['rep2'] for rep in succ1_fail2.values()]
-p_syntax_diff, p_value_diff = syntax_value_error_analysis(fail_reports)
-print(f"diff syntax={p_syntax_diff}, value={p_value_diff}")
-
-
-#%%
-
+# just look at each of their errors
 from train_mathqa import get_manager
 
-manager = get_manager()
-# find the average of all the dataset length
-# find the average of all the error of 2 length
-# find the average of correct 1 and error of 2 length
-succ1_fail2_indices = set(succ1_fail2.keys())
-succ1_fail2_lens = []
-fail2_indices = set()
-for i, rep in enumerate(reports2):
-    if rep['error_type'] != 'no_error':
-        fail2_indices.add(i)
-fail2_lens = []
-all_lens = []
-for i, datapoint in enumerate(manager.iter_dataset(part)):
-    code_len = len(datapoint.code_token_indices)
-    all_lens.append(code_len)
-    if i in succ1_fail2_indices:
-        succ1_fail2_lens.append(code_len)
-    if i in fail2_indices:
-        fail2_lens.append(code_len)
+no_macro_manager = get_manager()
+yes_macro_manager = get_manager(macro_file=config.get_n_macro_file(10))
 
-from statistics import mean
-fail2_avg_len = mean(fail2_lens)
-succ1_fail2_avg_len = mean(succ1_fail2_lens)
-avg_len = mean(all_lens)
-print(f"all={avg_len}, succ1_fail2={succ1_fail2_avg_len}, fail2={fail2_avg_len}")
+no_macro_errors = []
+yes_macro_errors = []
 
+for i in range(len(no_macro_dev_error_reports)):
+    no_macro_report = no_macro_dev_error_reports[i]
+    if no_macro_report['error_type'] != 'no_error':
+        no_macro_errors.append(i)
+    yes_macro_report = yes_macro_dev_error_reports[i]
+    if yes_macro_report['error_type'] != 'no_error':
+        yes_macro_errors.append(i)
+
+print(f"no_macro_errors: {len(no_macro_errors)}")
+print(f"yes_macro_errors: {len(yes_macro_errors)}")
+
+
+#%%
+# pretty print the produced programs and the original programs
+from pprint import pprint
+
+
+def pp_errors(manager: MathQAManager, error_report: list[dict], errors: list[int]):
+    to_print = []
+    bad_macro = 0
+    for i in errors:
+        generated = manager.code_vectorizer.token_list_to_string(error_report[i]['generated_tokens'])
+        datapoint = manager.get_datapoint('dev', i)
+        original = str(datapoint.program)
+        if 'macro' in generated and 'macro' not in original:
+            bad_macro += 1
+        if 'macro' in original:
+            print('***macro***')
+        to_print.append({'generated': generated, 'original': original})
+    print(f"bad_macro={bad_macro}")
+    pprint(to_print)
+
+
+#%%
+only_yes_macro_errors = set(yes_macro_errors).difference(no_macro_errors)
+only_no_macro_errors = set(no_macro_errors).difference(yes_macro_errors)
+print(f"only macro errors: {len(only_yes_macro_errors)}")
+print(f"only no macro errors: {len(only_no_macro_errors)}")
+
+
+#%%
+# print only_no_macro_errors
+pp_errors(yes_macro_manager, no_macro_dev_error_reports, only_no_macro_errors)
+
+#%%
+# print only_no_macro_errors
+pp_errors(yes_macro_manager, yes_macro_dev_error_reports, only_yes_macro_errors)

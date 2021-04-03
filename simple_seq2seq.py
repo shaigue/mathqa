@@ -1,4 +1,5 @@
 import torch
+from torch import Tensor
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
@@ -106,9 +107,203 @@ class Seq2Seq(nn.Module):
         return decoder_output
 
     def _beam_search_decode(self, source_tokens, source_lens, start_of_sequence_token: int, end_of_sequence_token: int,
-                            max_target_seq_len: int, beam_size: int = 1):
-        # TODO: support batched beam search decoding
-        pass
+                            max_target_seq_len: int, beam_size: int):
+        # TODO: test & beautify & review & refactor
+        # get the input dimensions
+        seq_len, batch_size = source_tokens.shape
+        assert len(source_lens) == batch_size
+
+        # feed the batch into the encoder
+        encoder_out, encoder_hidden = self.encoder(source_tokens, source_lens)
+        assert encoder_hidden.shape == (self.n_gru_layers, batch_size, self.hidden_dim)
+
+        # initialize the best decoded sequences
+        best_decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,
+                                  dtype=torch.long, device=get_module_device(self))
+        # set their probabilities to 0
+        best_probabilities = torch.zeros(size=(batch_size,), dtype=torch.float32, device=get_module_device(self))
+
+        # for simplicity, every iteration we will pass the same size of (n_active, beam_size, *)
+        n_active = batch_size
+        # this is to map the active samples to the original samples.
+        # a samples becomes 'inactive' if all it's running probabilities are not better then it's current best,
+        # since the probability only reduces as the sequence gets longer
+        active_to_orig_index = torch.arange(batch_size)
+        # the decoded sequence for each of the elements in the beam
+        decoded = torch.full(size=(n_active, beam_size, max_target_seq_len), fill_value=self.pad_index,
+                             dtype=torch.long, device=get_module_device(self))
+        # first token will be start of sequence token
+        decoded[:, :, 0] = start_of_sequence_token
+
+        # FIRST ITERATION #
+        decoder_hidden = encoder_hidden
+        # first input is all start_of_sequence
+        decoder_inputs = torch.full((1, batch_size), fill_value=start_of_sequence_token,
+                                    device=get_module_device(self))
+        # feed the decoder
+        next_token_logits, decoder_hidden_next = self.decoder(decoder_inputs, decoder_hidden)
+        assert next_token_logits.shape == (1, batch_size, self.target_vocab_size)
+        assert decoder_hidden_next.shape == (self.n_gru_layers, batch_size, self.hidden_dim)
+        # reshape the logits
+        next_token_logits = next_token_logits.view(batch_size, self.target_vocab_size)
+        # calculate the probabilities of the next tokens
+        next_probabilities = F.softmax(next_token_logits, dim=-1)
+        # pick the top beam_size with the best probabilities
+        probabilities, next_tokens = torch.topk(next_probabilities, beam_size, dim=1)
+        assert probabilities.shape == (batch_size, beam_size)
+        assert next_tokens.shape == (batch_size, beam_size)
+
+        # place the next tokens in the correct places
+        assert decoded.shape == (batch_size, beam_size, max_target_seq_len)
+        assert next_tokens.shape == (batch_size, beam_size)
+        decoded[:, :, 1] = next_tokens
+
+        # deal with the case where we have <EOS>
+        assert next_tokens.shape == (n_active, beam_size)
+        assert probabilities.shape == (n_active, beam_size)
+        finished_mask = (next_tokens == end_of_sequence_token)
+        # take for each of the active sample, take the best ending sequence, if exists, else put there 0
+        finished_probabilities = torch.where(finished_mask, probabilities, torch.zeros_like(probabilities))
+        best_finished_probabilities, best_finished_indices = torch.max(finished_probabilities, dim=1)
+
+        # compare the best probability for each active sample to the current best ending sequence.
+        # if it is better then put this as the best sequence
+        assert best_finished_probabilities.shape == (n_active,)
+        assert best_probabilities.shape == (batch_size,)
+        assert active_to_orig_index.shape == (n_active,)
+        assert best_decoded.shape == (batch_size, max_target_seq_len)
+        better_then_best_mask = (best_finished_probabilities > best_probabilities[active_to_orig_index])
+        update_indices = active_to_orig_index[better_then_best_mask]
+        # update the probabilities
+        best_probabilities[update_indices] = best_finished_probabilities[better_then_best_mask]
+        # update the sequences
+        # TODO
+        assert decoded.shape == (n_active, beam_size, max_target_seq_len)
+        beam_index = best_finished_indices[better_then_best_mask]
+        best_decoded[update_indices] = decoded[better_then_best_mask, beam_index]
+
+        # put zero probability where the next token is <EOS>.
+        assert probabilities.shape == (n_active, beam_size)
+        probabilities = torch.where(finished_mask, torch.zeros_like(probabilities), probabilities)
+
+        # remove the samples where all their probabilities are lower then the best current one from the active set
+        best_intermediate_p, _ = torch.max(probabilities, dim=1)
+        still_better_then_best_mask = (best_intermediate_p > best_probabilities[active_to_orig_index])
+        # now filter out all the tensors that are not active
+        n_active = still_better_then_best_mask.sum()
+        probabilities = probabilities[still_better_then_best_mask]
+        decoder_hidden = decoder_hidden[:, still_better_then_best_mask]
+        decoded = decoded[still_better_then_best_mask]
+        active_to_orig_index = active_to_orig_index[still_better_then_best_mask]
+
+        # FIRST ITERATION END #
+
+        # duplicate the same output again, for each beam
+        decoder_hidden = decoder_hidden_next.view(self.n_gru_layers, n_active, 1, self.hidden_dim)
+        decoder_hidden = decoder_hidden.expand(self.n_gru_layers, n_active, beam_size, self.hidden_dim)
+
+        for i in range(1, max_target_seq_len - 1):
+            # assert correct input sizes
+            assert decoded.shape == (n_active, beam_size, max_target_seq_len)
+            assert probabilities.shape == (n_active, beam_size)
+            assert decoder_hidden.shape == (self.n_gru_layers, n_active, beam_size, self.hidden_dim)
+            assert best_decoded.shape == (batch_size, max_target_seq_len)
+            assert best_probabilities.shape == (batch_size,)
+
+            # reshape the inputs before feeding them to the decoder
+            decoder_input = decoded[:, :, i].view(1, beam_size * n_active)
+            decoder_hidden_flat = decoder_hidden.contiguous().view(self.n_gru_layers, n_active * beam_size,
+                                                                   self.hidden_dim)
+
+            # feed the decoder
+            next_token_logits, decoder_hidden_next = self.decoder(decoder_input, decoder_hidden_flat)
+            assert next_token_logits.shape == (1, n_active * beam_size, self.target_vocab_size)
+            assert decoder_hidden_next.shape == (self.n_gru_layers, n_active * beam_size, self.hidden_dim)
+            # reshape the output tensors
+            decoder_hidden_next = decoder_hidden_next.view(self.n_gru_layers, n_active, beam_size, self.hidden_dim)
+            next_token_logits = next_token_logits.view(n_active, beam_size, self.target_vocab_size)
+
+            # calculate the probabilities of the next tokens
+            next_token_probabilities = F.softmax(next_token_logits, dim=-1)
+            # multiply the current probabilities with the probabilities for the next tokens
+            next_probabilities = probabilities.view(n_active, beam_size, 1) * next_token_probabilities
+            assert next_probabilities.shape == (n_active, beam_size, self.target_vocab_size)
+
+            # now pick for each active sample the best beam_size options
+            next_probabilities = next_probabilities.view(n_active, beam_size * self.target_vocab_size)
+            top_probabilities, top_indices = torch.topk(next_probabilities, beam_size, dim=-1)
+            top_beams = top_indices // self.target_vocab_size
+            next_tokens = top_indices % self.target_vocab_size
+
+            # update the sequences in the decoded tensor, according to the best beams
+            assert decoded.shape == (n_active, beam_size, max_target_seq_len)
+            assert top_beams.shape == (n_active, beam_size)
+            # add a singleton dimension at the end, and match the size of decoded tensor
+            index = top_beams.view(n_active, beam_size, 1).expand_as(decoded)
+            decoded = decoded.gather(dim=1, index=index)
+
+            # update the hidden state for the next run
+            assert top_beams.shape == (n_active, beam_size)
+            assert decoder_hidden_next.shape == (self.n_gru_layers, n_active, beam_size, self.hidden_dim)
+            # add a singleton dimension at the start, and the end, and expand to the same size as decoder_hidden
+            index = top_beams.view(1, n_active, beam_size, 1).expand_as(decoder_hidden)
+            decoder_hidden = decoder_hidden_next.gather(dim=2, index=index)
+
+            # place the next tokens in the correct places
+            assert decoded.shape == (n_active, beam_size, max_target_seq_len)
+            assert next_tokens.shape == (n_active, beam_size)
+            decoded[:, :, i + 1] = next_tokens
+
+            # update the probabilities
+            probabilities = top_probabilities
+
+            # deal with the case where we have <EOS>
+            assert next_tokens.shape == (n_active, beam_size)
+            assert probabilities.shape == (n_active, beam_size)
+            finished_mask = (next_tokens == end_of_sequence_token)
+            # take for each of the active sample, take the best ending sequence, if exists, else put there 0
+            finished_probabilities = torch.where(finished_mask, probabilities, torch.zeros_like(probabilities))
+            best_finished_probabilities, best_finished_indices = torch.max(finished_probabilities, dim=1)
+
+            # compare the best probability for each active sample to the current best ending sequence.
+            # if it is better then put this as the best sequence
+            assert best_finished_probabilities.shape == (n_active,)
+            assert best_probabilities.shape == (batch_size,)
+            assert active_to_orig_index.shape == (n_active,)
+            assert best_decoded.shape == (batch_size, max_target_seq_len)
+            better_then_best_mask = (best_finished_probabilities > best_probabilities[active_to_orig_index])
+            update_indices = active_to_orig_index[better_then_best_mask]
+            # update the probabilities
+            best_probabilities[update_indices] = best_finished_probabilities[better_then_best_mask]
+            # update the sequences
+            assert decoded.shape == (n_active, beam_size, max_target_seq_len)
+            beam_index = best_finished_indices[better_then_best_mask]
+            best_decoded[update_indices] = decoded[better_then_best_mask, beam_index]
+
+            # put zero probability where the next token is <EOS>.
+            assert probabilities.shape == (n_active, beam_size)
+            probabilities = torch.where(finished_mask, torch.zeros_like(probabilities), probabilities)
+
+            # remove the samples where all their probabilities are lower then the best current one from the active set
+            best_intermediate_p, _ = torch.max(probabilities, dim=1)
+            still_better_then_best_mask = (best_intermediate_p > best_probabilities[active_to_orig_index])
+            # now filter out all the tensors that are not active
+            n_active = still_better_then_best_mask.sum()
+            if n_active == 0:
+                break
+
+            probabilities = probabilities[still_better_then_best_mask]
+            decoder_hidden = decoder_hidden[:, still_better_then_best_mask]
+            decoded = decoded[still_better_then_best_mask]
+            active_to_orig_index = active_to_orig_index[still_better_then_best_mask]
+
+        # convert the best generated sequences into lists
+        decoded_list = []
+        for i in range(batch_size):
+            mask = best_decoded[i] != self.pad_index
+            decoded_list.append(best_decoded[i, mask].tolist())
+
+        return decoded_list
 
     def _greedy_decode(self, source_tokens, source_lens, start_of_sequence_token: int, end_of_sequence_token: int,
                        max_target_seq_len: int):
@@ -126,10 +321,11 @@ class Seq2Seq(nn.Module):
         # will change when <EOS> will be emitted
         batch_mapping = torch.arange(batch_size)
         decoder_hidden = encoder_hidden
-        decoder_input = torch.full(size=(1, batch_size), fill_value=start_of_sequence_token,
-                                   device=get_module_device(self))
+        decoded[:, 0] = start_of_sequence_token
+        decoder_input = decoded[:, 0].view(1, batch_size)
         n_active = batch_size
-        for i in range(max_target_seq_len):
+
+        for i in range(max_target_seq_len - 1):
             decoder_out, decoder_hidden = self.decoder(decoder_input, decoder_hidden)
             assert decoder_out.shape == (1, n_active, self.target_vocab_size)
             assert decoder_hidden.shape == (self.n_gru_layers, n_active, self.hidden_dim)
@@ -137,13 +333,14 @@ class Seq2Seq(nn.Module):
             # insert the next tokens to the decoded list
             decoder_out = decoder_out.view(n_active, self.target_vocab_size)
             next_tokens = torch.argmax(decoder_out, dim=1)
-            decoded[batch_mapping, i] = next_tokens
+            decoded[batch_mapping, i + 1] = next_tokens
 
             # find out what tokens are end-of-sequence
             end_of_sequence_mask = (next_tokens != end_of_sequence_token)
             n_active = end_of_sequence_mask.sum().item()
             if n_active == 0:
                 break
+
             batch_mapping = batch_mapping[end_of_sequence_mask]
             decoder_hidden = decoder_hidden[:, end_of_sequence_mask]
             decoder_input = next_tokens[end_of_sequence_mask].view(1, -1)

@@ -14,7 +14,6 @@ MAX_MACRO_SIZE = 8
 MAX_MACRO_INPUTS = 5
 
 MACRO_DIR = ROOT_DIR / 'macros'
-MACRO_10_FILE = MACRO_DIR / '10.pkl'
 TRAINING_LOGS_DIR = ROOT_DIR / 'training_logs'
 LOGS_DIR = ROOT_DIR / 'logs'
 

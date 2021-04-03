@@ -273,5 +273,5 @@ def macro_example():
 
 
 if __name__ == "__main__":
-    # example()
-    macro_example()
+    example()
+    # macro_example()
