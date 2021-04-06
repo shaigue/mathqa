@@ -14,23 +14,23 @@ MAX_MACRO_SIZE = 8
 MAX_MACRO_INPUTS = 5
 
 MACRO_DIR = ROOT_DIR / 'macros'
-MACRO_10_FILE = MACRO_DIR / '10.pkl'
 TRAINING_LOGS_DIR = ROOT_DIR / 'training_logs'
 LOGS_DIR = ROOT_DIR / 'logs'
 
 # ============================ Naming conventions ==============================
 # TODO: move here other naming conventions in the code
 # TODO: enable checkpoint loading if training was interrupted in the middle
-
+# TODO: add word vectors to the system
 # TODO: try to build a encoder - decoder with copy mechanism + works by considering the relative inputs
 #  + the hidden states of past created node.
+# TODO: save the special configurations for an experiment in a file to be automatically reproduced
 
 
 def get_n_macro_file(n_macros: int) -> Path:
     assert n_macros in [0, 1, 3, 5, 7, 9, 10], "Does not exist"
     if n_macros == 0:
         return None
-    return MACRO_DIR / f"{n_macros}.pkl"
+    return MACRO_DIR / f"{n_macros}.json"
 
 
 def get_exp_name(n_macros: int) -> str:

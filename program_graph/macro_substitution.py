@@ -1,17 +1,15 @@
 """This is a script to augment the dataset with macros, by replacing them in the real dataset"""
+import json
 from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
-import logging
 from pathlib import Path
 import pickle
 
-from math_qa import math_qa
-from program_graph.program import Program, Node, OperationNode
 import config
+from math_qa import math_qa
+from program_graph.program import Program, OperationNode
 
-# TODO: add word vectors to the system
-# TODO: save the macros as a string instead of pickle. IMPORTANT
 
 # setting the logger for this module
 _logger = config.get_logger(__file__)
@@ -160,17 +158,21 @@ def replace_macro_in_list(program_list: list[Program],
 
 
 def save_macro_extraction(extracted_macros: list[Program], modified_programs: list[Program], file: Path):
+    extracted_macros = [str(macro) for macro in extracted_macros]
+    modified_programs = [str(program) for program in modified_programs]
     data = {'extracted_macros': extracted_macros, 'modified_programs': modified_programs}
-    with open(file, 'wb') as f:
-        pickle.dump(data, f)
+    with file.open('w') as f:
+        json.dump(data, f)
 
 
 def load_macro_extraction(file: Path) -> tuple[list[Program], list[Program]]:
     """The output is first the list macros"""
-    with open(file, 'rb') as f:
-        data = pickle.load(f)
+    with open(file, 'r') as f:
+        data = json.load(f)
 
-    return data['extracted_macros'], data['modified_programs']
+    extracted_macros = [Program.from_linear_formula(macro) for macro in data['extracted_macros']]
+    modified_programs = [Program.from_linear_formula(program) for program in data['modified_programs']]
+    return extracted_macros, modified_programs
 
 
 class MacroData:

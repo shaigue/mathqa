@@ -113,9 +113,6 @@ def is_commutative(op) -> bool:
     return op in commutative_ops
 
 
-# TODO: maybe move to somewhere else, all bellow
-
-
 def extract_numbers_from_problem(problem: str) -> tuple[str, list[Union[int, float]]]:
     """Takes a problem text, finds the numbers in it, and replaces them with <num> token.
 

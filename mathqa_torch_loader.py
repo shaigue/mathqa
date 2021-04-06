@@ -1,8 +1,13 @@
+from collections import namedtuple
+
 import torch
-from torch.nn.utils.rnn import pack_padded_sequence, pad_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
-from mathqa_processing import MathQAManager
+from mathqa_processing import MathQAManager, MathQADatapoint
+
+TrainBatch = namedtuple('TrainBatch', ['text_tokens', 'text_lens', 'code_tokens', 'code_lens'])
+EvalBatch = namedtuple('EvalBatch', ['text_tokens', 'text_lens', 'inputs', 'answers'])
 
 
 class MathQADataset(Dataset):
@@ -10,70 +15,71 @@ class MathQADataset(Dataset):
         self.manager = manager
         self.partition = partition
 
-    def __getitem__(self, item: int):
+    def __getitem__(self, item: int) -> MathQADatapoint:
         datapoint = self.manager.get_datapoint(self.partition, item)
-        return datapoint.text_token_indices, datapoint.code_token_indices
+        return datapoint
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.manager.get_partition_length(self.partition)
 
 
-class PadCollateFn:
+class CollateFn:
     def __init__(self, pad_index: int, device):
         self.pad_index = pad_index
         self.device = device
 
-    def __call__(self, batch: list[tuple[list[int], list[int]]]):
+    def _pad_to_device(self, sequences: list[torch.Tensor]) -> torch.Tensor:
+        return pad_sequence(sequences, padding_value=self.pad_index).to(self.device)
+
+    def train_collate(self, batch: list[MathQADatapoint]) -> EvalBatch:
         texts = []
         texts_len = []
         codes = []
         codes_len = []
-        for text, code in batch:
-            text = torch.tensor(text)
-            code = torch.tensor(code)
+        for entry in batch:
+            text = torch.tensor(entry.text_token_indices)
             texts.append(text)
-            texts_len.append(len(text))
+            texts_len.append(text.shape[0])
+
+            code = torch.tensor(entry.code_token_indices)
             codes.append(code)
-            codes_len.append(len(code))
+            codes_len.append(code.shape[0])
         # transfer them to the device
-        texts = pad_sequence(texts, padding_value=self.pad_index).to(self.device)
-        codes = pad_sequence(codes, padding_value=self.pad_index).to(self.device)
-        # texts_len = torch.tensor(texts_len)
-        # codes_len = torch.tensor(codes_len, device=self.device)
+        texts = self._pad_to_device(texts)
+        codes = self._pad_to_device(codes)
 
-        return texts, codes, texts_len, codes_len
+        return TrainBatch(
+            text_tokens=texts,
+            text_lens=texts_len,
+            code_tokens=codes,
+            code_lens=codes_len,
+        )
 
+    def eval_collate(self, batch: list[MathQADatapoint]) -> EvalBatch:
+        text_tokens, text_lens, inputs, answers = [], [], [], []
 
-def get_train_loader(manager: MathQAManager, device, batch_size: int = 32) -> DataLoader:
-    dataset = MathQADataset(manager, 'train')
-    collate_fn = PadCollateFn(manager.pad_index, device)
-    dataloader = DataLoader(dataset, batch_size, True, collate_fn=collate_fn)
-    return dataloader
+        for entry in batch:
+            text = torch.tensor(entry.text_token_indices)
+            text_tokens.append(text)
+            text_lens.append(text.shape[0])
+            inputs.append(entry.extracted_numbers)
+            answers.append(entry.evaluated_result)
 
+        text_tokens = self._pad_to_device(text_tokens)
 
-def example():
-    import config
-    from torch import nn
-    manager = MathQAManager(config.MATHQA_DIR, max_vocabulary_size=100, dummy=True, no_punctuation=True)
-    dataloader = get_train_loader(manager, 'cpu', batch_size=32)
-    embedding = nn.Embedding(num_embeddings=manager.text_vocabulary_size, embedding_dim=42,
-                             padding_idx=manager.pad_index)
-    rnn = nn.GRU(42, 42)
-    linear = nn.Linear(42, 10)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=manager.pad_index)
-    for text_pad, code_pad, text_len, code_len in dataloader:
-        text_embedd = embedding(text_pad)
-        text_embedd_packed = pack_padded_sequence(text_embedd, text_len, enforce_sorted=False)
-        rnn_out, rnn_hidden = rnn(text_embedd_packed)
-        pad_out, pad_lens = pad_packed_sequence(rnn_out, padding_value=manager.pad_index)
-        seq_len, batch_size, hidden_dim = pad_out.shape
-        pad_out = pad_out[pad_lens - 1, torch.arange(batch_size)]#.view(batch_size, hidden_dim)
-        # will be S, B, H
-        linear_out = linear(pad_out)
-        dummy_label = torch.randint(10, (batch_size,))
-        loss = loss_fn(linear_out, dummy_label)
-        print(loss)
+        return EvalBatch(
+            text_tokens=text_tokens,
+            text_lens=text_lens,
+            inputs=inputs,
+            answers=answers,
+        )
 
 
-if __name__ == "__main__":
-    example()
+def get_loader(manager: MathQAManager, device, partition: str, train: bool,
+               batch_size: int = 32) -> DataLoader:
+    # TODO: support also multiple partitions
+    dataset = MathQADataset(manager, partition)
+    collate_fn = CollateFn(manager.pad_index, device)
+    if train:
+        return DataLoader(dataset, batch_size, shuffle=True, collate_fn=collate_fn.train_collate)
+    return DataLoader(dataset, batch_size, shuffle=False, collate_fn=collate_fn.eval_collate)

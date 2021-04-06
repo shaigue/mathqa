@@ -7,17 +7,11 @@ import numpy as np
 
 from config import get_experiment_logs
 from math_qa.math_qa import load_dataset, RawMathQAEntry
-from train_mathqa import evaluate_datapoint
+from train_mathqa import evaluate_batch
 from simple_seq2seq import Seq2Seq
 from mathqa_processing import MathQAManager, ErrorType
 import config
 from pathlib import Path
-
-# TODO: categorize the errors to syntax errors and value errors
-# TODO: find the 4 sets - both correct, both right, macro correct and vanilla incorrect, and vice versa
-# TODO: iterate through a debugger through one of those errors
-# TODO: analyze the results with the more epochs
-# TODO: make this also used when saving the model
 
 _logger = config.get_logger(__file__)
 
@@ -73,8 +67,6 @@ def print_stats():
     print(get_stats(macro_10_good))
 
 
-# TODO: make a get_manager and get_model functions.
-# TODO: save the special configurations for an experiment in a file to be automatically reproduced
 def get_error_types(device, logs: dict, manager: MathQAManager, model, partition: str) -> list[ErrorType]:
     per_sample_correctness = logs[f'{partition}_per_sample_correctness']
     # go find out, out of all the dev errors for the macro_10 model,
