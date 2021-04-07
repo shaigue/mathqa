@@ -182,6 +182,32 @@ class MyTestCase(unittest.TestCase):
             ref_val = refactored_program.eval(inputs, macro_dict)
             self.assertEqual(value, ref_val)
 
+    def test_match_subprogram(self):
+        lf1 = 'add(n0,n1)|add(#0,n1)|multiply(#1,n1)'
+        lf2 = 'add(n0,n1)|add(#0,n1)|multiply(#1,n1)|add(#2,n2)|add(#3,n2)|multiply(#4,n2)'
+        p1 = Program.from_linear_formula(lf1)
+        p2 = Program.from_linear_formula(lf2)
+        m = Program._match_subprogram(p2, p1)
+        self.assertEqual(len(m), 2)
+
+    def test_refactor_macro_without_subset(self):
+        lf1 = 'add(n0,n1)|add(#0,n1)|multiply(#1,n1)'
+        lf2 = 'add(n0,n1)|add(#0,n1)|multiply(#1,n1)|add(#2,n2)|add(#3,n2)|multiply(#4,n2)'
+        p1 = Program.from_linear_formula(lf1)
+        p2 = Program.from_linear_formula(lf2)
+        p3 = p2.refactor_macro_without_subset(p1, 'p1')
+        print(p3)
+        macro_dict = {'p1': p1}
+        inputs = [
+            [10, 11, 12],
+            [-1, 3, 7],
+            [1, -1, 0]
+        ]
+        for x in inputs:
+            refactored_eval = p3.eval(x, macro_dict)
+            normal_eval = p2.eval(x, macro_dict)
+            self.assertAlmostEqual(refactored_eval, normal_eval)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -113,8 +113,6 @@ class Program:
     # ==================== Public Methods ==============================================
     def __init__(self):
         self.graph = nx.MultiDiGraph()
-        # this is a cache in order to save time
-        self._eq_graph = None
 
     @classmethod
     def from_linear_formula(cls, linear_formula: str):
@@ -279,6 +277,53 @@ class Program:
         refactored_program.graph.remove_nodes_from(node_subset)
         return refactored_program
 
+    def refactor_macro_without_subset(self, macro, macro_name: str):
+        """Refactors a macro when the original vertices are not known."""
+        macro: Program
+        refactored_program = Program()
+        refactored_program.graph = nx.MultiDiGraph(self.graph)
+
+        # as long as there are matches, continue
+        matches = Program._match_subprogram(refactored_program, macro)
+        while len(matches) > 0:
+            for match in matches:
+                original_nodes = set(match.keys())
+                # check if there is a node that was already removed from the graph
+                all_present = True
+                for orig_node in original_nodes:
+                    if orig_node not in refactored_program.graph.nodes:
+                        all_present = False
+                if not all_present:
+                    continue
+
+                # add a new macro Node
+                macro_node_id = refactored_program._get_fresh_op_identifier()
+                new_node = OperationNode(macro_node_id, macro_name)
+                refactored_program.graph.add_node(new_node)
+
+                # connect the inputs
+                input_nodes = set()
+                for program_node, macro_node in match.items():
+                    if isinstance(macro_node, InputNode):
+                        refactored_program.graph.add_edge(program_node, new_node,
+                                                          key=macro_node.arg_num)
+                        input_nodes.add(program_node)
+
+                # connect the outputs
+                not_input_nodes = original_nodes.difference(input_nodes)
+                for src_node, dst_node, arg_num in refactored_program.graph.edges:
+                    # if it is inside of the non-input nodes
+                    if src_node in not_input_nodes and dst_node not in not_input_nodes:
+                        refactored_program.graph.add_edge(new_node, dst_node, arg_num)
+
+                # remove the original (not input nodes) from the graph
+                refactored_program.graph.remove_nodes_from(not_input_nodes)
+
+            # find new matches
+            matches = Program._match_subprogram(refactored_program, macro)
+
+        return refactored_program
+
     def sub_program(self, node_subset: frozenset[OperationNode], return_original_to_input_map=False):
         """Assumes that the node subset is only operation nodes.
 
@@ -327,28 +372,67 @@ class Program:
 
     def _get_eq_graph(self):
         """Returns the graph for isomorphic matching"""
-        if self._eq_graph is not None:
-            return self._eq_graph
-
-        self._eq_graph = nx.MultiDiGraph()
+        
+        eq_graph = nx.MultiDiGraph()
         # copy all the nodes, add the operation names as attributes
         for node in self.graph.nodes:
             attr = {}
             if isinstance(node, OperationNode):
                 attr['op_name'] = node.operation_name
-            self._eq_graph.add_node(node, **attr)
+            eq_graph.add_node(node, **attr)
         for input_node, output_node, arg_index in self.graph.edges:
             assert isinstance(output_node, OperationNode), "only operation nodes should have inputs"
             attr = {}
             # if it is not commutative then give meaning to the ordering
             if not output_node.is_commutative():
                 attr['arg_index'] = arg_index
-            self._eq_graph.add_edge(input_node, output_node, **attr)
+            eq_graph.add_edge(input_node, output_node, **attr)
 
-        return self._eq_graph
+        return eq_graph
+
+    def _get_eq_subgraph(self):
+        """This should be done on the smaller graph where matching sub-graphs.
+        This is because input nodes might be swapped with other operation nodes. so they need
+        to get special attention when matched.
+        """
+
+        eq_subgraph = nx.MultiDiGraph()
+        # copy all the nodes, add the operation names as attributes
+        for node in self.graph.nodes:
+            attr = {'input': False}
+            if isinstance(node, OperationNode):
+                attr['op_name'] = node.operation_name
+            if isinstance(node, InputNode):
+                attr['input'] = True
+            eq_subgraph.add_node(node, **attr)
+        for input_node, output_node, arg_index in self.graph.edges:
+            assert isinstance(output_node, OperationNode), "only operation nodes should have inputs"
+            attr = {}
+            # if it is not commutative then give meaning to the ordering
+            if not output_node.is_commutative():
+                attr['arg_index'] = arg_index
+            eq_subgraph.add_edge(input_node, output_node, **attr)
+
+        return eq_subgraph
+
+    @staticmethod
+    def _node_match_subgraph(big_graph_node_attr: dict, small_graph_node_attr: dict):
+        """Match any node with a subgraph input node, otherwise match all the attributes
+        except for 'input' attribute."""
+        if small_graph_node_attr['input']:
+            return True
+
+        for attr_name in big_graph_node_attr.keys():
+            if attr_name not in small_graph_node_attr:
+                return False
+            if big_graph_node_attr[attr_name] != small_graph_node_attr[attr_name]:
+                return False
+        return True
 
     @staticmethod
     def _edge_match(e1, e2):
+        """This is because in MultiGraph each 2 nodes have a list of edges.
+        their order does not matter since they carry the same value"""
         # check if there exists a permutation of them so they match on their values
         if len(e1) != len(e2):
             return False
@@ -373,6 +457,20 @@ class Program:
             return matcher.mapping
         else:
             return None
+
+    @staticmethod
+    def _match_subprogram(program, subprogram):
+        """Try to find a subset of nodes in programs such that is isomorphic to subprogram,
+        returns the list of matching (program node -> subprogram node). will be empty if there are
+        None.
+        """
+        program: Program
+        subprogram: Program
+        g1 = program._get_eq_graph()
+        g2 = subprogram._get_eq_subgraph()
+        matcher = isomorphism.MultiDiGraphMatcher(g1, g2, node_match=Program._node_match_subgraph,
+                                                  edge_match=Program._edge_match)
+        return list(matcher.subgraph_isomorphisms_iter())
 
     def _get_op_inputs(self, node: OperationNode) -> list[Node]:
         """return an ordered list of the nodes that the operation depends on"""

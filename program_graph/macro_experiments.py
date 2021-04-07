@@ -1,6 +1,7 @@
 """This is experiments to get intuitions about macros extraction"""
 
 from program_graph.macro_substitution import perform_macro_augmentation_on_train
+from program_graph.program import Program
 
 
 def extract_many_macros():
@@ -8,7 +9,15 @@ def extract_many_macros():
     perform_macro_augmentation_on_train(100, save_every=20)
 
 
-# TODO: add the ability to extract given macros from the dev and test sets for debugging
+def substitute_macros(macros: dict[str, Program], programs: list[Program]) -> list[Program]:
+    """Takes a list of of programs, and a dictionary with 'name': macro and substitutes
+    the given name from the programs that have those macros.
+    """
+    # TODO:
+    pass
+
+
+
 # TODO: add data augmentation during training by permuting the sequence
 # TODO: add constants to macros
 # TODO: add the ability to prioritize larger macros
