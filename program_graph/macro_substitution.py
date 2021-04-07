@@ -4,7 +4,6 @@ from collections import defaultdict
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-import pickle
 
 import config
 from math_qa import math_qa
@@ -35,7 +34,8 @@ class MacroAssociation:
     vertex_subset: frozenset[OperationNode]
 
     def conflicts(self, other) -> bool:
-        """Checks if 2 macro_10 associations conflict, i.e. whether they have the same index and non-empty intersection in
+        """Checks if 2 macro_10 associations conflict, i.e. whether they have the same index and non-empty intersection
+        in
         in their vertex_subset.
 
         :param other:
@@ -44,7 +44,9 @@ class MacroAssociation:
         return self.index == other.index and len(self.vertex_subset.intersection(other.vertex_subset)) > 0
 
 
-def get_macros_with_association(program: Program, program_index: int) -> dict[Program, list[MacroAssociation]]:
+def get_macros_with_association(program: Program, program_index: int,
+                                min_macro_size: int, max_macro_size: int,
+                                max_macro_inputs: int) -> dict[Program, list[MacroAssociation]]:
     """Finds for a single program all the macros that are associated with it,
     and logs the vertex indices that each macro_10 involves.
 
@@ -53,9 +55,9 @@ def get_macros_with_association(program: Program, program_index: int) -> dict[Pr
     :return:
     """
     macro_iterator = program.function_cut_iterator(
-        min_size=config.MIN_MACRO_SIZE,
-        max_size=config.MAX_MACRO_SIZE,
-        max_inputs=config.MAX_MACRO_INPUTS,
+        min_size=min_macro_size,
+        max_size=max_macro_size,
+        max_inputs=max_macro_inputs,
         return_subsets=True
     )
     macro_dict = defaultdict(list)
@@ -64,7 +66,9 @@ def get_macros_with_association(program: Program, program_index: int) -> dict[Pr
     return dict(macro_dict)
 
 
-def get_all_macro_associations(program_list: list[Program]) -> dict[Program, list[MacroAssociation]]:
+def get_all_macro_associations(program_list: list[Program], min_macro_size: int,
+                               max_macro_size: int, max_macro_inputs: int,
+                               ) -> dict[Program, list[MacroAssociation]]:
     """Collects all the macros and their associations in the list of programs
 
     :param program_list:
@@ -74,7 +78,13 @@ def get_all_macro_associations(program_list: list[Program]) -> dict[Program, lis
     for program_index, program in enumerate(program_list):
         if (program_index + 1) % 100 == 0:
             _logger.info(f"extracting macros from program={program_index + 1} out of {len(program_list)}")
-        current_program_macro_dict = get_macros_with_association(program, program_index)
+        current_program_macro_dict = get_macros_with_association(
+            program,
+            program_index,
+            min_macro_size,
+            max_macro_size,
+            max_macro_inputs
+        )
         # this will append the lists in the current locations
         for macro, association_list in current_program_macro_dict.items():
             macro_accumulator[macro] += association_list
@@ -98,7 +108,8 @@ def remove_conflicts_from_list(target_list: list[MacroAssociation], to_remove_li
 
 def remove_conflicting_associations(macro_associations: dict[Program, list[MacroAssociation]],
                                     target_macro: Program) -> dict[Program, list[MacroAssociation]]:
-    """Copies the current macro_10 associations, and removes from it all the associations that conflict with the macro_10
+    """Copies the current macro_10 associations, and removes from it all the associations that conflict with the
+    macro_10
     """
     assert target_macro in macro_associations, "target_macro has to be in macro_associations."
 
@@ -212,10 +223,14 @@ def filter_self_conflicting_macros(macro_associations: dict[Program, list[MacroA
     return new_associations
 
 
-def perform_macro_augmentation_on_train(n_macros: int, save_every=None):
+def perform_macro_augmentation_on_train(n_macros: int, save_every=None,
+                                        min_macro_size=config.MIN_MACRO_SIZE,
+                                        max_macro_size=config.MAX_MACRO_SIZE,
+                                        max_macro_inputs=config.MAX_MACRO_INPUTS):
     program_list = get_programs('train')
     # extract all the macro_10 associations
-    macro_associations = get_all_macro_associations(program_list)
+    macro_associations = get_all_macro_associations(program_list, min_macro_size,
+                                                    max_macro_size, max_macro_inputs)
     # removing the self conflicts from the list
     macro_associations = filter_self_conflicting_macros(macro_associations)
     # extract n_macros
