@@ -4,7 +4,9 @@ from mathqa_processing import MathQAManager
 from simple_seq2seq import Seq2Seq
 from train_mathqa import train, get_manager, get_model
 from program_graph.macro_experiments import extract_many_macros
-
+import run_experiments
+# TODO: organize this and clean main
+# TODO: delete irrelevant results
 
 _logger = config.get_logger(__file__)
 N_EPOCHS = 100
@@ -110,5 +112,5 @@ def different_number_of_macros():
 
 if __name__ == "__main__":
     # run_dropout_2_gru_layer_experiment()
-    extract_many_macros()
-
+    # extract_many_macros()
+    run_experiments.many_macros_experiment()

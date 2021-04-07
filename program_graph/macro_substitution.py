@@ -249,10 +249,10 @@ def perform_macro_augmentation_on_train(n_macros: int, save_every=None,
 
         if save_every is not None and (macro_num % save_every) == 0 and macro_num != (n_macros - 1):
             _logger.info(f"saving macro file no. {macro_num + 1}")
-            save_macro_extraction(extracted_macros, program_list, config.MACRO_DIR / f'{macro_num + 1}.pkl')
+            save_macro_extraction(extracted_macros, program_list, config.get_n_macro_file(n_macros))
     # save the required data to a file
     _logger.info(f"finished extracting macros, saving to file")
-    save_macro_extraction(extracted_macros, program_list, config.MACRO_DIR / f'{n_macros}.pkl')
+    save_macro_extraction(extracted_macros, program_list, config.get_n_macro_file(n_macros))
 
 
 def example():

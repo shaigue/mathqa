@@ -27,7 +27,6 @@ LOGS_DIR = ROOT_DIR / 'logs'
 
 
 def get_n_macro_file(n_macros: int) -> Path:
-    assert n_macros in [0, 1, 3, 5, 7, 9, 10], "Does not exist"
     if n_macros == 0:
         return None
     return MACRO_DIR / f"{n_macros}.json"
