@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 from typing import Union
 
+import config
 from math_qa import operations
 from math_qa import constants
 
@@ -53,6 +54,10 @@ def load_dataset(root_dir: Path, partition: str) -> list[RawMathQAEntry]:
     assert part_path.is_file(), f"{part_path} is not a file"
     return _load_json(part_path)
 
+
+def load_all_dataset(root_dir: Path = config.MATHQA_DIR) -> dict[str, list[RawMathQAEntry]]:
+    partitions = ['train', 'dev', 'test']
+    return {part: load_dataset(root_dir, part) for part in partitions}
 
 @dataclass
 class OperatorDescription:

@@ -26,23 +26,34 @@ LOGS_DIR = ROOT_DIR / 'logs'
 # TODO: save the special configurations for an experiment in a file to be automatically reproduced
 
 
-def get_n_macro_file(n_macros: int) -> Path:
+# ========================== For accessing the macro files ===================================
+def get_macro_file(n_macros: int) -> Path:
     if n_macros == 0:
         return None
     return MACRO_DIR / f"{n_macros}.json"
 
 
-def get_exp_name(n_macros: int) -> str:
-    return f"macro_{n_macros}"
+# ============================ for accessing training logs ====================================
 
-
-def get_macro_prefix(n_macros: int, prefix='') -> Path:
-    return TRAINING_LOGS_DIR / (prefix + get_exp_name(n_macros))
-
-
-def get_experiment_dir_path(exp_name: str) -> Path:
+def get_exp_dir_path(exp_name: str) -> Path:
     return TRAINING_LOGS_DIR / exp_name
 
+
+def get_exp_model_path(exp_name: str) -> Path:
+    return get_exp_dir_path(exp_name) / 'model.pt'
+
+
+def get_exp_train_log_path(exp_name: str) -> Path:
+    return get_exp_dir_path(exp_name) / 'train_log.json'
+
+
+def load_exp_train_log(exp_name: str) -> dict:
+    json_file = get_exp_train_log_path(exp_name)
+    with json_file.open('r') as f:
+        return json.load(f)
+
+
+# ============================ This is for logging ============================================
 
 def get_log_file(module_name: str):
     return LOGS_DIR / f'{module_name}.log'
@@ -59,9 +70,4 @@ def get_logger(file: str, mode='w') -> logging.Logger:
     return logger
 
 
-def get_experiment_logs(experiment_name: str):
-    filename = 'train_log.json'
-    experiment_dir = TRAINING_LOGS_DIR / experiment_name / filename
-    with experiment_dir.open('r') as f:
-        experiment_logs = json.load(f)
-    return experiment_logs
+

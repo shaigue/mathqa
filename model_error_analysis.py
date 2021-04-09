@@ -5,7 +5,7 @@ import itertools
 import torch
 import numpy as np
 
-from config import get_experiment_logs
+from config import load_exp_train_log
 from math_qa.math_qa import load_dataset, RawMathQAEntry
 from train_mathqa import evaluate_batch
 from simple_seq2seq import Seq2Seq
@@ -21,7 +21,7 @@ def get_model_path(experiment_name: str) -> Path:
 
 
 def per_sample_correctness(experiment_name: str, partition: str):
-    macro_10_logs = get_experiment_logs(experiment_name)
+    macro_10_logs = load_exp_train_log(experiment_name)
     return macro_10_logs[f'{partition}_per_sample_correctness']
 
 
@@ -115,8 +115,8 @@ def main():
         macro_file=config.MACRO_10_FILE
     )
     # load the training logs
-    vanilla_logs = get_experiment_logs('vanilla')
-    macro_10_logs = get_experiment_logs('macro_10')
+    vanilla_logs = load_exp_train_log('vanilla')
+    macro_10_logs = load_exp_train_log('macro_10')
     # load the models
     macro_10_model = Seq2Seq(
         macro_10_manager.text_vocabulary_size,

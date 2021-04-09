@@ -15,17 +15,17 @@ N_EPOCHS = 100
 def run_dropout_2_gru_layer_experiment():
     n_epochs = 300
     for n_macros in [0, 10]:
-        macro_file = config.get_n_macro_file(n_macros)
+        macro_file = config.get_macro_file(n_macros)
         manager = get_manager(macro_file=macro_file)
         for dropout, layers in [(0.2, 1), (0, 2), (0.2, 2)]:
             model = get_model(manager, dropout, layers)
             exp_name = f"macro_{n_macros}_dropout_{dropout}_layers_{layers}"
-            exp_dir = config.get_experiment_dir_path(exp_name)
+            exp_dir = config.get_exp_dir_path(exp_name)
             train(dir_path=exp_dir, model=model, manager=manager, n_epochs=n_epochs)
 
 
 def run_multiple_macro_experiments(num_macros: int, prefix='', n_epochs=200):
-    macro_file = config.get_n_macro_file(num_macros)
+    macro_file = config.get_macro_file(num_macros)
     manager = get_manager(macro_file=macro_file)
     model = get_model(manager)
     prefix = config.get_macro_prefix(num_macros, prefix)

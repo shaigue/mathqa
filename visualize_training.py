@@ -35,7 +35,7 @@ logs = {}
 converge_n_macros = [0, 5, 10]
 for n_macro in converge_n_macros:
     exp_name = f"converge_macro_{n_macro}"
-    logs[n_macro] = config.get_experiment_logs(exp_name)
+    logs[n_macro] = config.load_exp_train_log(exp_name)
 
 # draw training loss plots
 plot_for_different_macro_num(logs, 'epoch_loss')

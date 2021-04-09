@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 import config
+from math_qa.math_qa import RawMathQAEntry
 from mathqa_processing import MathQAManager, ErrorReport, ErrorType
 from mathqa_torch_loader import get_loader, TrainBatch, EvalBatch
 from simple_seq2seq import Seq2Seq
@@ -239,13 +240,15 @@ def train(dir_path: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int,
     _logger.info(f"{dir_path.name} training finished")
 
 
-def get_manager(no_punctuation: bool = True, macro_file=None, dummy=False):
+def get_manager(no_punctuation: bool = True, macro_file=None, dummy=False,
+                raw_data: dict[str, list[RawMathQAEntry]] = None):
     return MathQAManager(
         root_dir=config.MATHQA_DIR,
         max_vocabulary_size=config.MAX_VOCABULARY_SIZE,
         dummy=dummy,
         macro_file=macro_file,
         no_punctuation=no_punctuation,
+        raw_data=raw_data
     )
 
 

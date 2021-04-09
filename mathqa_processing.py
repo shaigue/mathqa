@@ -101,7 +101,7 @@ class MathQAManager:
     partitions = ['train', 'dev', 'test']
 
     def __init__(self, root_dir: Path, max_vocabulary_size: int, dummy=False, macro_file: Optional[Path] = None,
-                 no_punctuation: bool = False):
+                 no_punctuation: bool = False, raw_data: dict[str, list[RawMathQAEntry]] = None):
         self.dummy = dummy
 
         self.macro_data = None
@@ -110,9 +110,12 @@ class MathQAManager:
             self.macro_data = MacroData.from_file(macro_file)
             self.macro_dict = self.macro_data.macro_dict
 
-        raw_entries = {}
-        for partition in self.partitions:
-            raw_entries[partition] = mathqa.load_dataset(root_dir, partition)
+        if raw_data is None:
+            raw_entries = {}
+            for partition in self.partitions:
+                raw_entries[partition] = mathqa.load_dataset(root_dir, partition)
+        else:
+            raw_entries = raw_data
 
         processed_entries = _process_raw_mathqa_entries(raw_entries, self.macro_data)
 

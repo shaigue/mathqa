@@ -11,8 +11,8 @@ exp_yes_macro_name = 'converge_macro_10'
 
 
 #%%
-logs_no_macro = config.get_experiment_logs(exp_no_macro_name)
-logs_yes_macro = config.get_experiment_logs(exp_yes_macro_name)
+logs_no_macro = config.load_exp_train_log(exp_no_macro_name)
+logs_yes_macro = config.load_exp_train_log(exp_yes_macro_name)
 
 
 #%%
@@ -26,7 +26,7 @@ yes_macro_dev_error_reports = logs_yes_macro['dev_per_sample_report']
 from train_mathqa import get_manager
 
 no_macro_manager = get_manager()
-yes_macro_manager = get_manager(macro_file=config.get_n_macro_file(10))
+yes_macro_manager = get_manager(macro_file=config.get_macro_file(10))
 
 no_macro_errors = []
 yes_macro_errors = []

@@ -7,11 +7,20 @@ from pathlib import Path
 
 import config
 from math_qa import math_qa
+from math_qa.math_qa import RawMathQAEntry
 from program_graph.program import Program, OperationNode
 
 
 # setting the logger for this module
 _logger = config.get_logger(__file__)
+
+
+def extract_programs(entries: list[RawMathQAEntry]) -> list[Program]:
+    programs = []
+    for datapoint in entries:
+        program = Program.from_linear_formula(datapoint.linear_formula)
+        programs.append(program)
+    return programs
 
 
 def get_programs(partition: str) -> list[Program]:
@@ -21,11 +30,7 @@ def get_programs(partition: str) -> list[Program]:
     :return: a list of all the programs in the partition, with the same ordering
     """
     data = math_qa.load_dataset(config.MATHQA_DIR, partition)
-    programs = []
-    for datapoint in data:
-        program = Program.from_linear_formula(datapoint.linear_formula)
-        programs.append(program)
-    return programs
+    return extract_programs(data)
 
 
 @dataclass(frozen=True)
@@ -226,8 +231,13 @@ def filter_self_conflicting_macros(macro_associations: dict[Program, list[MacroA
 def perform_macro_augmentation_on_train(n_macros: int, save_every=None,
                                         min_macro_size=config.MIN_MACRO_SIZE,
                                         max_macro_size=config.MAX_MACRO_SIZE,
-                                        max_macro_inputs=config.MAX_MACRO_INPUTS):
-    program_list = get_programs('train')
+                                        max_macro_inputs=config.MAX_MACRO_INPUTS,
+                                        data: list[RawMathQAEntry] = None,
+                                        target_file: Path = None):
+    if data is None:
+        program_list = get_programs('train')
+    else:
+        program_list = extract_programs(data)
     # extract all the macro_10 associations
     macro_associations = get_all_macro_associations(program_list, min_macro_size,
                                                     max_macro_size, max_macro_inputs)
@@ -249,10 +259,13 @@ def perform_macro_augmentation_on_train(n_macros: int, save_every=None,
 
         if save_every is not None and (macro_num % save_every) == 0 and macro_num != (n_macros - 1):
             _logger.info(f"saving macro file no. {macro_num + 1}")
-            save_macro_extraction(extracted_macros, program_list, config.get_n_macro_file(n_macros))
+            save_macro_extraction(extracted_macros, program_list, config.get_macro_file(n_macros))
     # save the required data to a file
     _logger.info(f"finished extracting macros, saving to file")
-    save_macro_extraction(extracted_macros, program_list, config.get_n_macro_file(n_macros))
+    if target_file is None:
+        save_macro_extraction(extracted_macros, program_list, config.get_macro_file(n_macros))
+    else:
+        save_macro_extraction(extracted_macros, program_list, target_file)
 
 
 def example():
