@@ -90,25 +90,30 @@ def get_subset_with_avg_ops(data: dict[str, list[RawMathQAEntry]],
 def different_avg_len_macros():
     all_data = load_all_dataset()
     data_frac = 1 / 3
-    for avg_len in [2, 3, 4, 5, 6]:
+    # lens = [2, 3, 4, 5, 6]
+    lens = [5, 6]
+    for avg_len in lens:
         _logger.info(f'starting {avg_len}')
         exp_name = f'diff_avg_len_{avg_len}'
         # get the correct subset of the data
         subset_data = get_subset_with_avg_ops(all_data, avg_len, data_frac)
-        # load the manager with the regular data
-        manager = get_manager(raw_data=subset_data)
-        model = get_model(manager)
-        exp_dir = config.get_exp_dir_path(exp_name)
-        # train the model on it
-        _logger.info(f'training no macro')
-        train(exp_dir, model, manager, 200, 10)
+
+        if avg_len != 5:  # TODO: hacky
+            # load the manager with the regular data
+            manager = get_manager(raw_data=subset_data)
+            model = get_model(manager)
+            exp_dir = config.get_exp_dir_path(exp_name)
+            # train the model on it
+            _logger.info(f'training no macro')
+            train(exp_dir, model, manager, 200, 10)
 
         # extract 10 macros out of it and save it to a file
         exp_name = f'diff_avg_len_{avg_len}_macro'
         macro_file = config.MACRO_DIR / (exp_name + '.json')
-        _logger.info(f'extracting macros')
-        perform_macro_augmentation_on_train(10, data=subset_data['train'],
-                                            target_file=macro_file)
+        if avg_len != 5:  # TODO: hacky
+            _logger.info(f'extracting macros')
+            perform_macro_augmentation_on_train(10, data=subset_data['train'],
+                                                target_file=macro_file)
         # load the manager with macros
         manager = get_manager(raw_data=subset_data, macro_file=macro_file)
         model = get_model(manager)
