@@ -1,3 +1,5 @@
+from config import get_old_correctness_rate, get_new_correctness_rate
+
 converge_experiments = {i: f'converge_macro_{i}' for i in [0, 5, 10]}
 many_macros_experiments = {i: f'many_macros_{i}' for i in [21, 41, 61, 81, 100]}
 # experiment_names = {}
@@ -19,19 +21,7 @@ for i, exp_name in many_macros_experiments.items():
 
 
 #%%
-# just get the final train, dev, test correctness rates
-def get_old_correctness_rate(train_log: dict, part: str) -> float:
-    return train_log[f'{part}_correctness_rate'][-1]['value']
 
-
-def get_new_correctness_rate(train_log: dict, part: str) -> float:
-    d = train_log[part]['correctness_rate']
-    k, v = d.popitem()
-    d[k] = v
-    return v
-
-
-#%%
 correctness_rates = {}
 for part in ['train', 'test', 'dev']:
     correctness_rates[part] = {}

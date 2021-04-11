@@ -70,4 +70,12 @@ def get_logger(file: str, mode='w') -> logging.Logger:
     return logger
 
 
+def get_old_correctness_rate(train_log: dict, part: str) -> float:
+    return train_log[f'{part}_correctness_rate'][-1]['value']
 
+
+def get_new_correctness_rate(train_log: dict, part: str) -> float:
+    d = train_log[part]['correctness_rate']
+    k, v = d.popitem()
+    d[k] = v
+    return v
