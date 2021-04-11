@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 
 import config
 
-fig, axes = plt.subplots(1, 3)
+fig, axes = plt.subplots(1, 3, figsize=(20, 10))
+fig.suptitle('average program length and macros',
+             fontsize=16)
 
 partitions = ['train', 'test', 'dev']
-
 for i, part in enumerate(partitions):
     ax = axes[i]
-    # TODO: add 5, 6
-    x = [2, 3, 4, ]
+    x = [2, 3, 4, 5, 6]
     y_macro = []
     y_no_macro = []
     for avg_len in x:
@@ -28,6 +28,7 @@ for i, part in enumerate(partitions):
     ax.plot(x, y_macro, label='macro')
     ax.plot(x, y_no_macro, label='no macro')
     ax.set_title(part)
+    ax.set_xticks(x)
     ax.set_ylim(0.7, 1)
     ax.legend()
 
