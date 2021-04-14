@@ -4,7 +4,7 @@ import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader
 
-from mathqa_processing import MathQAManager, MathQADatapoint
+from preprocessing.mathqa_processing import MathQAManager, MathQADatapoint
 
 TrainBatch = namedtuple('TrainBatch', ['text_tokens', 'text_lens', 'code_tokens', 'code_lens'])
 EvalBatch = namedtuple('EvalBatch', ['text_tokens', 'text_lens', 'inputs', 'answers'])

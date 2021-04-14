@@ -1,5 +1,4 @@
 from statistics import mean
-from typing import Union
 import itertools
 
 import torch
@@ -7,9 +6,8 @@ import numpy as np
 
 from config import load_exp_train_log
 from math_qa.math_qa import load_dataset, RawMathQAEntry
-from train_mathqa import evaluate_batch
-from simple_seq2seq import Seq2Seq
-from mathqa_processing import MathQAManager, ErrorType
+from models.simple_seq2seq import Seq2Seq
+from preprocessing.mathqa_processing import MathQAManager, ErrorType
 import config
 from pathlib import Path
 

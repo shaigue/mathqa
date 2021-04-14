@@ -3,9 +3,7 @@ from collections import defaultdict
 import math
 from enum import Enum
 from pathlib import Path
-from typing import Union, Iterator, Optional
-
-import numpy as np
+from typing import Union, Optional
 
 from math_qa import math_qa as mathqa
 from math_qa.math_qa import RawMathQAEntry

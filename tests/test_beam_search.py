@@ -3,8 +3,8 @@ from pathlib import Path
 
 import torch
 import torch.nn.functional as F
-from mathqa_torch_loader import EvalBatch
-from train_mathqa import get_model, get_manager, evaluate, get_loader
+from preprocessing.mathqa_torch_loader import EvalBatch
+from train_mathqa import get_model, get_manager, get_loader
 
 
 class TestBeamSearch(unittest.TestCase):

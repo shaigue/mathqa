@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
 
-#%%
 import config
 
 
-#%%
 def get_x_y_from_logs(log_list):
     x = []
     y = []
@@ -16,7 +14,6 @@ def get_x_y_from_logs(log_list):
     return x, y
 
 
-#%%
 def plot_for_different_macro_num(logs: dict, field: str, ylim=None):
     plt.figure()
     for num_macro, curr_logs in logs.items():
@@ -30,7 +27,6 @@ def plot_for_different_macro_num(logs: dict, field: str, ylim=None):
     plt.show()
 
 
-#%%
 logs = {}
 converge_n_macros = [0, 5, 10]
 for n_macro in converge_n_macros:
@@ -45,7 +41,6 @@ plot_for_different_macro_num(logs, 'train_correctness_rate', (0, 1))
 plot_for_different_macro_num(logs, 'dev_correctness_rate', (0, 1))
 
 
-#%%
 for i in converge_n_macros:
     partitions = ['train', 'dev', 'test']
     s = f"macros={i} final correctness rates: "

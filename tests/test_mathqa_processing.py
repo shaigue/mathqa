@@ -1,7 +1,7 @@
 import unittest
 import itertools
 
-from mathqa_processing import MathQAManager
+from preprocessing.mathqa_processing import MathQAManager
 import config
 
 # TODO: do thorough checks before submitting the paper

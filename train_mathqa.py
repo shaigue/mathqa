@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader
 
 import config
 from math_qa.math_qa import RawMathQAEntry
-from mathqa_processing import MathQAManager, ErrorReport, ErrorType
-from mathqa_torch_loader import get_loader, TrainBatch, EvalBatch
-from simple_seq2seq import Seq2Seq
+from preprocessing.mathqa_processing import MathQAManager, ErrorReport, ErrorType
+from preprocessing.mathqa_torch_loader import get_loader, TrainBatch, EvalBatch
+from models.simple_seq2seq import Seq2Seq
 
 _logger = config.get_logger(__file__)
 
