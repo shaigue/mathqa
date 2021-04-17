@@ -102,7 +102,7 @@ def different_avg_len_macros(i=None):
         exp_dir = config.get_exp_dir_path(exp_name)
         # train the model on it
         _logger.info(f'training no macro')
-        # train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
+        train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
         # extract 10 macros out of it and save it to a file
         exp_name = f'diff_avg_len_{avg_len}_macro'
@@ -119,7 +119,7 @@ def different_avg_len_macros(i=None):
         exp_dir = config.get_exp_dir_path(exp_name)
         # train the model with macros
         _logger.info(f'training with macro')
-        # train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
+        train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
 
 def filter_by_complexity(data: dict[str, list[RawMathQAEntry]], complexity_func,
