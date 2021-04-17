@@ -7,7 +7,7 @@ from typing import Union, Optional
 
 from math_qa import math_qa as mathqa
 from math_qa.math_qa import RawMathQAEntry
-from text_processing import TextVectorizer
+from preprocessing.text_processing import TextVectorizer
 from program_graph.program import Program
 from program_graph.macro_substitution import MacroData
 

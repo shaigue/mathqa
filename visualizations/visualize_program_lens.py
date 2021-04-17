@@ -1,13 +1,12 @@
 import matplotlib.pyplot as plt
-from math_qa.math_qa import load_dataset, RawMathQAEntry
+from math_qa.math_qa import load_dataset
 import config
 import numpy as np
-from fractions import Fraction
 import time
 
 
 #%%
-from program_graph.macro_experiments import get_n_samples, select_samples, get_n_ops
+from macro_experiments import get_n_samples, select_samples, get_n_ops
 
 
 # plot a histogram for train / test/ dev for the number of operations in the programs

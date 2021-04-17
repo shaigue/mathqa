@@ -6,20 +6,14 @@ from math_qa.math_qa import load_all_dataset, RawMathQAEntry
 from program_graph.macro_substitution import perform_macro_augmentation_on_train
 from program_graph.program import Program
 from train_mathqa import get_manager, get_model, train
+from program_complexity import log1_num_tokens_on_entry
 
 _logger = config.get_logger(__file__)
+
 
 def extract_many_macros():
     """extract 100 macros and run training on 20, 40, 60, 80, 100"""
     perform_macro_augmentation_on_train(100, save_every=20)
-
-
-def substitute_macros(macros: dict[str, Program], programs: list[Program]) -> list[Program]:
-    """Takes a list of of programs, and a dictionary with 'name': macro and substitutes
-    the given name from the programs that have those macros.
-    """
-    # TODO:
-    pass
 
 
 def select_samples(samples_lens: list[int], n_samples: int, target_avg: int) -> list[int]:
@@ -90,30 +84,27 @@ def get_subset_with_avg_ops(data: dict[str, list[RawMathQAEntry]],
 def different_avg_len_macros():
     all_data = load_all_dataset()
     data_frac = 1 / 3
-    # lens = [2, 3, 4, 5, 6]
-    lens = [5, 6]
+    lens = [2, 3, 4, 5, 6]
     for avg_len in lens:
         _logger.info(f'starting {avg_len}')
         exp_name = f'diff_avg_len_{avg_len}'
         # get the correct subset of the data
         subset_data = get_subset_with_avg_ops(all_data, avg_len, data_frac)
 
-        if avg_len != 5:  # TODO: hacky
-            # load the manager with the regular data
-            manager = get_manager(raw_data=subset_data)
-            model = get_model(manager)
-            exp_dir = config.get_exp_dir_path(exp_name)
-            # train the model on it
-            _logger.info(f'training no macro')
-            train(exp_dir, model, manager, 200, 10)
+        # load the manager with the regular data
+        manager = get_manager(raw_data=subset_data)
+        model = get_model(manager)
+        exp_dir = config.get_exp_dir_path(exp_name)
+        # train the model on it
+        _logger.info(f'training no macro')
+        train(exp_dir, model, manager, 200, 10)
 
         # extract 10 macros out of it and save it to a file
         exp_name = f'diff_avg_len_{avg_len}_macro'
         macro_file = config.MACRO_DIR / (exp_name + '.json')
-        if avg_len != 5:  # TODO: hacky
-            _logger.info(f'extracting macros')
-            perform_macro_augmentation_on_train(10, data=subset_data['train'],
-                                                target_file=macro_file)
+        _logger.info(f'extracting macros')
+        perform_macro_augmentation_on_train(10, data=subset_data['train'],
+                                            target_file=macro_file)
         # load the manager with macros
         manager = get_manager(raw_data=subset_data, macro_file=macro_file)
         model = get_model(manager)
@@ -121,6 +112,47 @@ def different_avg_len_macros():
         # train the model with macros
         _logger.info(f'training with macro')
         train(exp_dir, model, manager, 200, 10)
+
+
+def filter_by_complexity(data: dict[str, list[RawMathQAEntry]], complexity_func,
+                         threshold: float, keep_higher=True) -> dict[str, list[RawMathQAEntry]]:
+    filtered_data = {}
+    for part, entries in data.items():
+        filtered_data[part] = []
+        for entry in entries:
+            if keep_higher and complexity_func(entry) >= threshold:
+                filtered_data[part].append(entry)
+            if not keep_higher and complexity_func(entry) < threshold:
+                filtered_data[part].append(entry)
+    return filtered_data
+
+
+def high_complexity_macro():
+    """Performs training only on samples with higher complexity than the threshold."""
+    data = load_all_dataset()
+    complexity_threshold = 4
+    data = filter_by_complexity(data, log1_num_tokens_on_entry, complexity_threshold)
+    sample_count = {part: len(entries) for part, entries in data.items()}
+    msg = ""
+    for part, count in sample_count.items():
+        msg += f"n_{part}={count};"
+    _logger.info(msg)
+
+    # no macro experiment
+    exp_name = f"complexity_higher_than_{complexity_threshold}"
+    manager = get_manager(raw_data=data)
+    model = get_model(manager)
+    exp_dir = config.get_exp_dir_path(exp_name)
+    train(exp_dir, model, manager, 200, 10)
+
+    # with macros
+    exp_name = exp_name + "_macro"
+    macro_file = config.MACRO_DIR / (exp_name + '.json')
+    perform_macro_augmentation_on_train(10, data=data['train'], target_file=macro_file)
+    manager = get_manager(raw_data=data, macro_file=macro_file)
+    model = get_model(manager)
+    exp_dir = config.get_exp_dir_path(exp_name)
+    train(exp_dir, model, manager, 200, 10)
 
 
 # TODO: add data augmentation during training by permuting the sequence

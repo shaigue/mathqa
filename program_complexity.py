@@ -15,5 +15,5 @@ def log1_num_tokens(linear_formula: str) -> float:
     return math.log2(1 + num_tokens(linear_formula))
 
 
-
-
+def log1_num_tokens_on_entry(entry: math_qa.RawMathQAEntry) -> float:
+    return log1_num_tokens(entry.linear_formula)
