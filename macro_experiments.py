@@ -13,6 +13,7 @@ N_EPOCHS = 250
 EVAL_EVERY = 10
 N_MACROS = 10
 
+
 def extract_many_macros():
     """extract 100 macros and run training on 20, 40, 60, 80, 100"""
     perform_macro_augmentation_on_train(100, save_every=20)
@@ -83,13 +84,15 @@ def get_subset_with_avg_ops(data: dict[str, list[RawMathQAEntry]],
     return subset_data
 
 
-def different_avg_len_macros():
+def different_avg_len_macros(i=None):
     all_data = load_all_dataset()
     data_frac = 1 / 3
     lens = [2, 3, 4, 5, 6]
     for avg_len in lens:
         _logger.info(f'starting {avg_len}')
         exp_name = f'diff_avg_len_{avg_len}'
+        if i is not None:
+            exp_name += f'_{i}'
         # get the correct subset of the data
         subset_data = get_subset_with_avg_ops(all_data, avg_len, data_frac)
 
@@ -99,21 +102,24 @@ def different_avg_len_macros():
         exp_dir = config.get_exp_dir_path(exp_name)
         # train the model on it
         _logger.info(f'training no macro')
-        train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
+        # train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
         # extract 10 macros out of it and save it to a file
         exp_name = f'diff_avg_len_{avg_len}_macro'
         macro_file = config.MACRO_DIR / (exp_name + '.json')
-        _logger.info(f'extracting macros')
-        perform_macro_augmentation_on_train(N_MACROS, data=subset_data['train'],
-                                            target_file=macro_file)
+        if i is not None:
+            exp_name += f'_{i}'
+        if not macro_file.is_file():
+            _logger.info(f'extracting macros')
+            perform_macro_augmentation_on_train(N_MACROS, data=subset_data['train'],
+                                                target_file=macro_file)
         # load the manager with macros
         manager = get_manager(raw_data=subset_data, macro_file=macro_file)
         model = get_model(manager)
         exp_dir = config.get_exp_dir_path(exp_name)
         # train the model with macros
         _logger.info(f'training with macro')
-        train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
+        # train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
 
 def filter_by_complexity(data: dict[str, list[RawMathQAEntry]], complexity_func,
