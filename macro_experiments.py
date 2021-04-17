@@ -9,7 +9,9 @@ from train_mathqa import get_manager, get_model, train
 from program_complexity import log1_num_tokens_on_entry
 
 _logger = config.get_logger(__file__)
-
+N_EPOCHS = 250
+EVAL_EVERY = 10
+N_MACROS = 10
 
 def extract_many_macros():
     """extract 100 macros and run training on 20, 40, 60, 80, 100"""
@@ -97,13 +99,13 @@ def different_avg_len_macros():
         exp_dir = config.get_exp_dir_path(exp_name)
         # train the model on it
         _logger.info(f'training no macro')
-        train(exp_dir, model, manager, 200, 10)
+        train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
         # extract 10 macros out of it and save it to a file
         exp_name = f'diff_avg_len_{avg_len}_macro'
         macro_file = config.MACRO_DIR / (exp_name + '.json')
         _logger.info(f'extracting macros')
-        perform_macro_augmentation_on_train(10, data=subset_data['train'],
+        perform_macro_augmentation_on_train(N_MACROS, data=subset_data['train'],
                                             target_file=macro_file)
         # load the manager with macros
         manager = get_manager(raw_data=subset_data, macro_file=macro_file)
@@ -111,7 +113,7 @@ def different_avg_len_macros():
         exp_dir = config.get_exp_dir_path(exp_name)
         # train the model with macros
         _logger.info(f'training with macro')
-        train(exp_dir, model, manager, 200, 10)
+        train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
 
 def filter_by_complexity(data: dict[str, list[RawMathQAEntry]], complexity_func,
@@ -143,16 +145,16 @@ def high_complexity_macro():
     manager = get_manager(raw_data=data)
     model = get_model(manager)
     exp_dir = config.get_exp_dir_path(exp_name)
-    train(exp_dir, model, manager, 200, 10)
+    train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
     # with macros
     exp_name = exp_name + "_macro"
     macro_file = config.MACRO_DIR / (exp_name + '.json')
-    perform_macro_augmentation_on_train(10, data=data['train'], target_file=macro_file)
+    perform_macro_augmentation_on_train(N_MACROS, data=data['train'], target_file=macro_file)
     manager = get_manager(raw_data=data, macro_file=macro_file)
     model = get_model(manager)
     exp_dir = config.get_exp_dir_path(exp_name)
-    train(exp_dir, model, manager, 200, 10)
+    train(exp_dir, model, manager, N_EPOCHS, EVAL_EVERY)
 
 
 # TODO: add data augmentation during training by permuting the sequence
