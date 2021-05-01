@@ -92,6 +92,10 @@ def get_constants_descriptors() -> list[ConstantDescriptor]:
     return descriptors
 
 
+def get_categories() -> list[str]:
+    return ['other', 'general', 'physics', 'gain', 'geometry', 'probability']
+
+
 def is_commutative(op) -> bool:
     commutative_ops = (
         operations.multiply,
@@ -157,6 +161,33 @@ def tokenize_linear_formula(linear_formula: str) -> list[str]:
         else:
             last_token += char
     return tokens
+
+
+def get_n_ops(dp: RawMathQAEntry) -> int:
+    lf = dp.linear_formula
+    if lf[-1] == '|':
+        lf = lf[:-1]
+    return lf.count('|')
+
+
+def get_n_temps(dp: RawMathQAEntry) -> int:
+    return get_n_ops(dp) - 1
+
+
+def get_n_inputs(dp: RawMathQAEntry) -> int:
+    number_regexp = re.compile(r'\d+\.?\d*')
+    matches = number_regexp.findall(dp.problem)
+    return len(matches)
+
+
+def get_max_train_temps() -> int:
+    all_data = load_all_dataset()
+    return max(get_n_temps(dp) for dp in all_data['train'])
+
+
+def get_max_train_inputs() -> int:
+    all_data = load_all_dataset()
+    return max(get_n_inputs(dp) for dp in all_data['train'])
 
 
 def join_tokenized_linear_formula(tokenized_linear_formula: list[str]) -> str:

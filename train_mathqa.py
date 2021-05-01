@@ -1,7 +1,7 @@
 """This is a code to train a sequence to sequence model with teacher forcing"""
 import json
 from pathlib import Path
-from typing import Union
+from typing import Union, Iterator
 
 import torch
 import torch.nn.functional as F
@@ -11,7 +11,7 @@ import config
 from math_qa.math_qa import RawMathQAEntry
 from preprocessing.mathqa_processing import MathQAManager, ErrorReport, ErrorType
 from preprocessing.mathqa_torch_loader import get_loader, TrainBatch, EvalBatch
-from models.simple_seq2seq import Seq2Seq
+from models.simple_seq2seq import SimpleSeq2Seq
 
 _logger = config.get_logger(__file__)
 
@@ -39,6 +39,27 @@ class TrainLogs:
         assert epoch >= 0
         return self.logs[partition][metric][epoch]
 
+    def iter_epoch_value(self, partition: str, metric: str) -> Iterator[tuple[int, float]]:
+        assert metric in self.metrics
+        assert partition in self.partitions
+        for epoch, value in self.logs[partition][metric].items():
+            yield epoch, value
+
+    def get_epoch_value_lists(self, partition: str, metric: str) -> tuple[list[int], list[float]]:
+        epochs = []
+        values = []
+        for epoch, value in self.iter_epoch_value(partition, metric):
+            epochs.append(epoch)
+            values.append(value)
+        return epochs, values
+
+    def get_max_value(self, partition: str, metric: str) -> float:
+        max_value = None
+        for epoch, value in self.iter_epoch_value(partition, metric):
+            if max_value is None or max_value < value:
+                max_value = value
+        return max_value
+
     def to_json(self, json_path: Path):
         with json_path.open('w') as f:
             json.dump(self.logs, f)
@@ -59,6 +80,18 @@ class TrainLogs:
         return new_logs
 
 
+def get_train_log_path(train_logs_dir: Path) -> Path:
+    return train_logs_dir / 'train_log.json'
+
+
+def get_error_report_path(train_logs_dir: Path) -> Path:
+    return train_logs_dir / 'error_report.json'
+
+
+def get_checkpoint_path(train_logs_dir: Path) -> Path:
+    return train_logs_dir / 'model.pt'
+
+
 def teacher_forcing_loss(target_token_indices, predicted_target_token_logits, pad_index: int) -> torch.Tensor:
     seq_len, batch_size, target_vocabulary_size = predicted_target_token_logits.shape
     assert target_token_indices.shape == (seq_len, batch_size)
@@ -72,7 +105,7 @@ def teacher_forcing_loss(target_token_indices, predicted_target_token_logits, pa
     return F.cross_entropy(predicted_target_token_logits, target_token_indices, ignore_index=pad_index)
 
 
-def train_batch(model: Seq2Seq, optimizer: torch.optim.Optimizer, batch: TrainBatch) -> float:
+def train_batch(model: SimpleSeq2Seq, optimizer: torch.optim.Optimizer, batch: TrainBatch) -> float:
     optimizer.zero_grad()
 
     predicted_target_token_logits = model(
@@ -94,7 +127,7 @@ def train_batch(model: Seq2Seq, optimizer: torch.optim.Optimizer, batch: TrainBa
     return loss.item()
 
 
-def train_epoch(model: Seq2Seq, optimizer: torch.optim.Optimizer, train_loader: DataLoader) -> float:
+def train_epoch(model: SimpleSeq2Seq, optimizer: torch.optim.Optimizer, train_loader: DataLoader) -> float:
     model.train()
     total_loss = 0
     n_batches = 0
@@ -108,7 +141,7 @@ def train_epoch(model: Seq2Seq, optimizer: torch.optim.Optimizer, train_loader: 
     return avg_loss
 
 
-def evaluate_batch(model: Seq2Seq, manager: MathQAManager, batch: EvalBatch,
+def evaluate_batch(model: SimpleSeq2Seq, manager: MathQAManager, batch: EvalBatch,
                    beam_size: int = 1) -> list[ErrorReport]:
 
     generated = model.generate(
@@ -131,7 +164,7 @@ def evaluate_batch(model: Seq2Seq, manager: MathQAManager, batch: EvalBatch,
     return error_reports
 
 
-def evaluate(model: Seq2Seq, manager: MathQAManager, loader: DataLoader, return_per_sample=False,
+def evaluate(model: SimpleSeq2Seq, manager: MathQAManager, loader: DataLoader, return_per_sample=False,
              beam_size: int = 1) -> Union[float, tuple[float, list[ErrorReport]]]:
     model.eval()
     n_correct = 0
@@ -163,15 +196,15 @@ def convert_error_report_json(er: ErrorReport) -> dict:
     return {'error_type': er.error_type.name, 'generated_tokens': er.generated_tokens}
 
 
-def train(dir_path: Path, model: Seq2Seq, manager: MathQAManager, n_epochs: int,
+def train(dir_path: Path, model: SimpleSeq2Seq, manager: MathQAManager, n_epochs: int,
           evaluate_every=5, batch_size=32, lr=0.01, weight_decay=1e-4,
           lr_decay_factor=0.2, lr_patience=1, beam_size=1):
 
     # set up the logs files
     dir_path.mkdir(parents=True, exist_ok=True)
-    logs_file = dir_path / 'train_log.json'
-    error_reports_file = dir_path / 'error_report.json'
-    checkpoint_file = dir_path / 'model.pt'
+    logs_file = get_train_log_path(dir_path)
+    error_reports_file = get_error_report_path(dir_path)
+    checkpoint_file = get_checkpoint_path(dir_path)
 
     # decide on what device to use and move the model there
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -253,7 +286,7 @@ def get_manager(no_punctuation: bool = True, macro_file=None, dummy=False,
 
 
 def get_model(manager: MathQAManager, dropout: float = 0, n_gru_layers: int = 1):
-    return Seq2Seq(
+    return SimpleSeq2Seq(
         source_vocabulary_size=manager.text_vocabulary_size,
         target_vocabulary_size=manager.code_vocabulary_size,
         hidden_dim=config.INTERNAL_DIM,

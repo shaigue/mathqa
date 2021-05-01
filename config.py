@@ -6,6 +6,9 @@ ROOT_DIR = Path(__file__).parent
 DATA_DIR = ROOT_DIR / "data"
 MATHQA_DIR = DATA_DIR / 'MathQA'
 
+MAX_INPUTS = 25
+MAX_ARGS = 5
+
 MAX_VOCABULARY_SIZE = 10_000
 INTERNAL_DIM = 128
 

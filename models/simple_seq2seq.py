@@ -1,14 +1,9 @@
 import torch
-from torch import Tensor
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
-
-def get_module_device(module: nn.Module):
-    parameter_iterator = module.parameters()
-    first_parameter = next(parameter_iterator)
-    return first_parameter.device
+from models.common import get_device
 
 
 class Encoder(nn.Module):
@@ -44,7 +39,7 @@ class Encoder(nn.Module):
         return gru_outputs, next_hidden_state
 
     def _initial_hidden_state(self, batch_size):
-        return torch.zeros(self.n_gru_layers, batch_size, self.hidden_dim, device=get_module_device(self))
+        return torch.zeros(self.n_gru_layers, batch_size, self.hidden_dim, device=get_device(self))
 
 
 class Decoder(nn.Module):
@@ -84,10 +79,10 @@ class Decoder(nn.Module):
         return token_logits, next_hidden_state
 
 
-class Seq2Seq(nn.Module):
+class SimpleSeq2Seq(nn.Module):
     def __init__(self, source_vocabulary_size: int, target_vocabulary_size: int, hidden_dim: int,
                  pad_index: int, dropout: float = 0.0, n_gru_layers: int = 1):
-        super(Seq2Seq, self).__init__()
+        super(SimpleSeq2Seq, self).__init__()
         self.source_vocab_size = source_vocabulary_size
         self.target_vocab_size = target_vocabulary_size
         self.hidden_dim = hidden_dim
@@ -119,9 +114,9 @@ class Seq2Seq(nn.Module):
 
         # initialize the best decoded sequences
         best_decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,
-                                  dtype=torch.long, device=get_module_device(self))
+                                  dtype=torch.long, device=get_device(self))
         # set their probabilities to 0
-        best_probabilities = torch.zeros(size=(batch_size,), dtype=torch.float32, device=get_module_device(self))
+        best_probabilities = torch.zeros(size=(batch_size,), dtype=torch.float32, device=get_device(self))
 
         # for simplicity, every iteration we will pass the same size of (n_active, beam_size, *)
         n_active = batch_size
@@ -131,7 +126,7 @@ class Seq2Seq(nn.Module):
         active_to_orig_index = torch.arange(batch_size)
         # the decoded sequence for each of the elements in the beam
         decoded = torch.full(size=(n_active, beam_size, max_target_seq_len), fill_value=self.pad_index,
-                             dtype=torch.long, device=get_module_device(self))
+                             dtype=torch.long, device=get_device(self))
         # first token will be start of sequence token
         decoded[:, :, 0] = start_of_sequence_token
 
@@ -139,7 +134,7 @@ class Seq2Seq(nn.Module):
         decoder_hidden = encoder_hidden
         # first input is all start_of_sequence
         decoder_inputs = torch.full((1, batch_size), fill_value=start_of_sequence_token,
-                                    device=get_module_device(self))
+                                    device=get_device(self))
         # feed the decoder
         next_token_logits, decoder_hidden_next = self.decoder(decoder_inputs, decoder_hidden)
         assert next_token_logits.shape == (1, batch_size, self.target_vocab_size)
@@ -315,7 +310,7 @@ class Seq2Seq(nn.Module):
         assert encoder_hidden.shape == (self.n_gru_layers, batch_size, self.hidden_dim)
 
         decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,
-                             device=get_module_device(self))
+                             device=get_device(self))
 
         # this tells us what batch corresponds to each entry in decoded.
         # will change when <EOS> will be emitted
@@ -400,7 +395,7 @@ def example():
     loss_fn = nn.CrossEntropyLoss(ignore_index=pad_index)
 
     # create the model
-    model = Seq2Seq(
+    model = SimpleSeq2Seq(
         source_vocabulary_size=source_vocab_size,
         target_vocabulary_size=target_vocab_size,
         hidden_dim=hidden_dim,

@@ -12,6 +12,6 @@ source "$CONDA_HOME/etc/profile.d/conda.sh"
 conda activate $CONDA_ENV
 # set the python path to the current directory
 export PYTHONPATH="$PWD"
-# Run python with the args to the script
+# Run python with the incoming to the script
 python main.py
 echo "*** SLURM BATCH JOB '$JOB_NAME' DONE ***"

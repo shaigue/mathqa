@@ -6,7 +6,7 @@ import numpy as np
 
 from config import load_exp_train_log
 from math_qa.math_qa import load_dataset, RawMathQAEntry
-from models.simple_seq2seq import Seq2Seq
+from models.simple_seq2seq import SimpleSeq2Seq
 from preprocessing.mathqa_processing import MathQAManager, ErrorType
 import config
 from pathlib import Path
@@ -116,7 +116,7 @@ def main():
     vanilla_logs = load_exp_train_log('vanilla')
     macro_10_logs = load_exp_train_log('macro_10')
     # load the models
-    macro_10_model = Seq2Seq(
+    macro_10_model = SimpleSeq2Seq(
         macro_10_manager.text_vocabulary_size,
         macro_10_manager.code_vocabulary_size,
         config.INTERNAL_DIM,
@@ -124,7 +124,7 @@ def main():
     state_dict_path = get_model_path('macro_10')
     state_dict = torch.load(state_dict_path, map_location=device)
     macro_10_model.load_state_dict(state_dict)
-    vanilla_model = Seq2Seq(
+    vanilla_model = SimpleSeq2Seq(
         vanilla_manager.text_vocabulary_size,
         vanilla_manager.code_vocabulary_size,
         config.INTERNAL_DIM
