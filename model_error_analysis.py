@@ -24,7 +24,7 @@ def per_sample_correctness(experiment_name: str, partition: str):
 
 
 def get_good_bad_datapoints(partition: str, flags: list[bool]):
-    data = load_dataset(config.MATHQA_DIR, partition)
+    data = load_dataset(partition, config.MATHQA_DIR)
     assert len(data) == len(flags)
     good = []
     bad = []

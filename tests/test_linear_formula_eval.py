@@ -7,7 +7,7 @@ class TestAllEval(unittest.TestCase):
     def test_all_eval(self):
         partitions = ['train', 'test', 'dev']
         for part in partitions:
-            data = mathqa.load_dataset(config.MATHQA_DIR, part)
+            data = mathqa.load_dataset(part, config.MATHQA_DIR)
             for dp in data:
                 value = dp.processed_linear_formula.eval(dp.processed_problem.numbers)
                 self.assertIsNotNone(value)

@@ -1,4 +1,6 @@
 import re
+from collections import namedtuple
+from typing import Iterator
 
 import numpy as np
 import torch
@@ -24,6 +26,9 @@ def get_category_label_encoder() -> LabelEncoder:
     categories = math_qa.get_categories()
     le.fit(categories)
     return le
+
+
+ArgSelectionDatapoint = namedtuple('ArgSelectionDatapoint', ['adj_tensor', 'node_labels', 'dst_node', 'src_node'])
 
 
 class Node:
@@ -81,13 +86,13 @@ class FormulaGraph:
     def get_adj_tensor(self) -> ndarray:
         """
 
-        :return: a bool array stating if there is an edge of type t, from node j to node i in the entry
+        :return: a bool array stating if there is an edge of type t, from node i to node j in the entry
             t, i, j. dimensions are (n_edge_types, n_nodes, n_nodes).
         """
         adj_tensor = np.zeros((self.n_edge_types, self.n_nodes, self.n_nodes), dtype=np.bool8)
         for i, node in enumerate(self.in_adj_list):
             for t, j in enumerate(node.incoming):
-                adj_tensor[t, i, j] = True
+                adj_tensor[t, j, i] = True
 
         return adj_tensor
 
@@ -98,12 +103,39 @@ class FormulaGraph:
         """
         return np.array([node.label for node in self.in_adj_list])
 
+    def iter_partial(self) -> Iterator[ArgSelectionDatapoint]:
+        """
+
+        :yields: a ArgSelectionDatapoint
+        """
+        node_labels = self.get_node_labels()
+        adj_tensor = np.zeros((self.n_edge_types, self.n_nodes, self.n_nodes), dtype=np.bool8)
+
+        # first place all the const nodes and the input nodes
+        for dst_node_i in range(self.n_inputs + self.n_const, self.n_nodes):
+            node = self.in_adj_list[dst_node_i]
+            for edge_type, src_node_i in enumerate(node.incoming):
+                datapoint = ArgSelectionDatapoint(
+                    adj_tensor=adj_tensor[:, :dst_node_i+1, :dst_node_i+1].copy(),
+                    node_labels=node_labels[:dst_node_i+1].copy(),
+                    dst_node=dst_node_i,
+                    src_node=src_node_i,
+                )
+                yield datapoint
+                adj_tensor[edge_type, src_node_i, dst_node_i] = True
+
+
+def get_formula_graphs(partition: str) -> list[FormulaGraph]:
+    assert partition in ['train', 'dev', 'test']
+    raw_entries = math_qa.load_dataset(partition, config.MATHQA_DIR)
+    return [FormulaGraph(e.linear_formula) for e in raw_entries]
+
 
 class GraphClassificationDataset(Dataset):
     def __init__(self, partition: str):
         assert partition in ['train', 'dev', 'test']
         category_encoder = get_category_label_encoder()
-        raw_entries = math_qa.load_dataset(config.MATHQA_DIR, partition)
+        raw_entries = math_qa.load_dataset(partition, config.MATHQA_DIR)
         node_label_encoder = get_node_label_encoder()
         self.adj_tensors, self.node_labels, self.categories = [], [], []
 

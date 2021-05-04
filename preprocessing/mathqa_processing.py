@@ -111,7 +111,7 @@ class MathQAManager:
         if raw_data is None:
             raw_entries = {}
             for partition in self.partitions:
-                raw_entries[partition] = mathqa.load_dataset(root_dir, partition)
+                raw_entries[partition] = mathqa.load_dataset(partition, root_dir)
         else:
             raw_entries = raw_data
 

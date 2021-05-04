@@ -29,7 +29,7 @@ def get_programs(partition: str) -> list[Program]:
     :param partition:
     :return: a list of all the programs in the partition, with the same ordering
     """
-    data = math_qa.load_dataset(config.MATHQA_DIR, partition)
+    data = math_qa.load_dataset(partition, config.MATHQA_DIR)
     return extract_programs(data)
 
 

@@ -46,7 +46,7 @@ def _load_all_raw(math_qa_path: Path) -> list[RawMathQAEntry]:
     return all_raw
 
 
-def load_dataset(root_dir: Path, partition: str) -> list[RawMathQAEntry]:
+def load_dataset(partition: str, root_dir: Path = config.MATHQA_DIR) -> list[RawMathQAEntry]:
     """Loads the correct partition of the dataset"""
     assert partition in ['train', 'test', 'dev', 'all'], f"got bad partition {partition}"
     assert root_dir.is_dir(), f"{root_dir} is not a directory"
@@ -57,7 +57,7 @@ def load_dataset(root_dir: Path, partition: str) -> list[RawMathQAEntry]:
 
 def load_all_dataset(root_dir: Path = config.MATHQA_DIR) -> dict[str, list[RawMathQAEntry]]:
     partitions = ['train', 'dev', 'test']
-    return {part: load_dataset(root_dir, part) for part in partitions}
+    return {part: load_dataset(part, root_dir) for part in partitions}
 
 @dataclass
 class OperatorDescription:

@@ -12,7 +12,7 @@ from macro_experiments import get_n_samples, select_samples, get_n_ops
 # plot a histogram for train / test/ dev for the number of operations in the programs
 def plot_plots():
     for part in ['train', 'test', 'dev']:
-        entries = load_dataset(config.MATHQA_DIR, part)
+        entries = load_dataset(part, config.MATHQA_DIR)
         program_lens = [get_n_ops(entry) for entry in entries]
         bins = np.arange(1, 55, 1)
         plt.hist(x=program_lens, bins=bins)
@@ -34,7 +34,7 @@ for avg_len in avg_lens:
         start = time.time()
         print(f"part={part}, avg_len={avg_len}")
 
-        dataset = load_dataset(config.MATHQA_DIR, part)
+        dataset = load_dataset(part, config.MATHQA_DIR)
         n_total_samples = len(dataset)
         n_samples = get_n_samples(n_total_samples, frac)
         n_ops = [get_n_ops(entry) for entry in dataset]

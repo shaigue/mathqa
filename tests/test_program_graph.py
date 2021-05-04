@@ -13,7 +13,7 @@ class MyTestCase(unittest.TestCase):
         self.mathqa_data = []
         partitions = ['train', 'test', 'dev']
         for part in partitions:
-            self.mathqa_data += mathqa.load_dataset(config.MATHQA_DIR, part)
+            self.mathqa_data += mathqa.load_dataset(part, config.MATHQA_DIR)
 
     def test_all_linear_formulas_compile(self):
         for i, entry in enumerate(self.mathqa_data):
