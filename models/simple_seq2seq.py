@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 
-from models.common import get_device
+from models.common import get_module_device
 
 
 class Encoder(nn.Module):
@@ -39,7 +39,7 @@ class Encoder(nn.Module):
         return gru_outputs, next_hidden_state
 
     def _initial_hidden_state(self, batch_size):
-        return torch.zeros(self.n_gru_layers, batch_size, self.hidden_dim, device=get_device(self))
+        return torch.zeros(self.n_gru_layers, batch_size, self.hidden_dim, device=get_module_device(self))
 
 
 class Decoder(nn.Module):
@@ -114,9 +114,9 @@ class SimpleSeq2Seq(nn.Module):
 
         # initialize the best decoded sequences
         best_decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,
-                                  dtype=torch.long, device=get_device(self))
+                                  dtype=torch.long, device=get_module_device(self))
         # set their probabilities to 0
-        best_probabilities = torch.zeros(size=(batch_size,), dtype=torch.float32, device=get_device(self))
+        best_probabilities = torch.zeros(size=(batch_size,), dtype=torch.float32, device=get_module_device(self))
 
         # for simplicity, every iteration we will pass the same size of (n_active, beam_size, *)
         n_active = batch_size
@@ -126,7 +126,7 @@ class SimpleSeq2Seq(nn.Module):
         active_to_orig_index = torch.arange(batch_size)
         # the decoded sequence for each of the elements in the beam
         decoded = torch.full(size=(n_active, beam_size, max_target_seq_len), fill_value=self.pad_index,
-                             dtype=torch.long, device=get_device(self))
+                             dtype=torch.long, device=get_module_device(self))
         # first token will be start of sequence token
         decoded[:, :, 0] = start_of_sequence_token
 
@@ -134,7 +134,7 @@ class SimpleSeq2Seq(nn.Module):
         decoder_hidden = encoder_hidden
         # first input is all start_of_sequence
         decoder_inputs = torch.full((1, batch_size), fill_value=start_of_sequence_token,
-                                    device=get_device(self))
+                                    device=get_module_device(self))
         # feed the decoder
         next_token_logits, decoder_hidden_next = self.decoder(decoder_inputs, decoder_hidden)
         assert next_token_logits.shape == (1, batch_size, self.target_vocab_size)
@@ -306,11 +306,11 @@ class SimpleSeq2Seq(nn.Module):
         assert len(source_lens) == batch_size
 
         encoder_out, encoder_hidden = self.encoder(source_tokens, source_lens)
-        # assert encoder_out.shape == (seq_len, batch_size, self.hidden_dim)
+        # assert encoder_out.shape == (seq_len, batch_size, self.embedding_dim)
         assert encoder_hidden.shape == (self.n_gru_layers, batch_size, self.hidden_dim)
 
         decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,
-                             device=get_device(self))
+                             device=get_module_device(self))
 
         # this tells us what batch corresponds to each entry in decoded.
         # will change when <EOS> will be emitted

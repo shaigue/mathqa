@@ -20,6 +20,8 @@ MACRO_DIR = ROOT_DIR / 'macros'
 TRAINING_LOGS_DIR = ROOT_DIR / 'training_logs'
 LOGS_DIR = ROOT_DIR / 'logs'
 
+PRETRAINED_PROBLEM_VECTOR_DIR = MATHQA_DIR / 'pretrained_vectors'
+
 # ============================ Naming conventions ==============================
 # TODO: move here other naming conventions in the code
 # TODO: enable checkpoint loading if training was interrupted in the middle

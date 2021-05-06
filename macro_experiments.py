@@ -3,8 +3,7 @@ from fractions import Fraction
 
 import config
 from math_qa.math_qa import load_all_dataset, RawMathQAEntry
-from program_graph.macro_substitution import perform_macro_augmentation_on_train
-from program_graph.program import Program
+from macro_extraction.macro_substitution import perform_macro_augmentation_on_train
 from train_mathqa import get_manager, get_model, train
 from program_complexity import log1_num_tokens_on_entry
 
@@ -167,7 +166,7 @@ def high_complexity_macro():
 # TODO: add constants to macros
 # TODO: add the ability to prioritize larger macros
 # TODO: filter short programs from the dataset, and check what happens
-# TODO: filter programs with small amounts of operations types in them
+# TODO: filter programs with small amounts of op_list types in them
 # TODO: add fixed vocabulary
 # TODO: add RL
 # TODO: add state machine decode

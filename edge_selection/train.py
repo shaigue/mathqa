@@ -4,9 +4,9 @@ from torch import optim, Tensor
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
-from edge_selection.data_utils import ArgSelectionDataset, ArgSelectionDatapoint
+from edge_selection.data_utils import ArgSelectionDataset
 from edge_selection.model import EdgeSelectionModel
-from graph_classification.common import get_max_n_args, get_n_node_labels
+from program_graph.utils import get_max_n_args, get_n_node_labels
 
 
 def check_correct(logits: Tensor, gt: int) -> int:

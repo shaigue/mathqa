@@ -1,9 +1,9 @@
 import torch
 from torch.nn import functional
 
-from graph_classification.common import get_n_categories
+from program_graph.utils import get_n_categories
 from problem_classification.model import TextClassifier
-from problem_classification.data_utils import ProblemClassificationDataset, get_data_loaders
+from problem_classification.data_utils import get_data_loaders
 from torch import optim
 from torch.utils.tensorboard import SummaryWriter
 

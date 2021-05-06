@@ -3,8 +3,11 @@
 import unittest
 
 import config
-from program_graph.program import Program, OperationNode
+from program_graph.convert_to_nx_graph import parsed_linear_formula_to_nx_graph
+from program_graph.parse_linear_formula import ParsedLinearFormula, ArgType, Arg, parse_linear_formula
+from macro_extraction.program import Program, OperationNode
 import math_qa.math_qa as mathqa
+
 
 
 class MyTestCase(unittest.TestCase):
@@ -208,6 +211,25 @@ class MyTestCase(unittest.TestCase):
             normal_eval = p2.eval(x, macro_dict)
             self.assertAlmostEqual(refactored_eval, normal_eval)
 
+    def test_parse_linear_formula(self):
+        lf = 'add(n0,n0)|multiply(#0,const_1)|divide(#1,#0)|'
+        expected = ParsedLinearFormula(
+            op_list=['add', 'multiply', 'divide'],
+            arg_list_list=[
+                [Arg(ArgType.input, 0), Arg(ArgType.input, 0)],
+                [Arg(ArgType.temp, 0), Arg(ArgType.const, 'const_1')],
+                [Arg(ArgType.temp, 1), Arg(ArgType.temp, 0)]
+            ]
+        )
+        result = parse_linear_formula(lf)
+        self.assertEqual(result, expected)
+
+    def test_parsed_linear_formula_to_nx_graph(self):
+        lf = 'add(n0,n0)|multiply(#0,const_1)|divide(#1,#0)|'
+        # TODO: not a test
+        result = parse_linear_formula(lf)
+        result = parsed_linear_formula_to_nx_graph(result, 2)
+        print(result)
 
 if __name__ == '__main__':
     unittest.main()

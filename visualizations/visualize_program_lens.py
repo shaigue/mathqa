@@ -9,7 +9,7 @@ import time
 from macro_experiments import get_n_samples, select_samples, get_n_ops
 
 
-# plot a histogram for train / test/ dev for the number of operations in the programs
+# plot a histogram for train / test/ dev for the number of op_list in the programs
 def plot_plots():
     for part in ['train', 'test', 'dev']:
         entries = load_dataset(part, config.MATHQA_DIR)

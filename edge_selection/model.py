@@ -8,8 +8,6 @@ import math
 import torch
 from torch import nn, Tensor
 
-from graph_classification.model import GraphNodeEmbedding
-
 
 def dot_attention_score(keys: Tensor, queries: Tensor, scaled: bool = False) -> Tensor:
     assert keys.ndim == queries.ndim == 2

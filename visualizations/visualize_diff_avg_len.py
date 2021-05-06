@@ -37,7 +37,7 @@ for i, part in enumerate(partitions):
     if i == 0:
         ax.set_ylabel('correctness rate', fontsize=20)
     if i == 1:
-        ax.set_xlabel('average #operations', fontsize=20)
+        ax.set_xlabel('average #op_list', fontsize=20)
     if i == 2:
         ax.legend(fontsize=20)
 
