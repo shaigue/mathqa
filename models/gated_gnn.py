@@ -1,121 +1,58 @@
 """This is the implementation of a simple Gated Graph Neural Network with typed edges and initial node features."""
 import math
-from dataclasses import dataclass, field
 
 import torch
 from torch import nn
 from torch import Tensor
 # TODO: test
-
-
-@dataclass
-class GGNNInput:
-    """
-        adj_tensor: (edge_type, node, node) sparse tensor
-        node_embedding: (node, node_embedding_dim) tensor
-    """
-    adj_tensor: Tensor
-    node_embedding: Tensor
-    n_prop_steps: int
-    n_nodes: int = field(init=False)
-    n_edge_types: int = field(init=False)
-    device: torch.device = field(init=False)
-    embedding_dim: int = field(init=False)
-
-    def __post_init__(self):
-        assert self.adj_tensor.ndim == 3
-        assert self.node_embedding.ndim == 2
-        assert self.adj_tensor.shape[1] == self.adj_tensor.shape[2] == self.node_embedding.shape[0]
-        assert self.adj_tensor.device == self.node_embedding.device
-        assert self.n_prop_steps >= 0
-        assert self.adj_tensor.dtype == torch.float32
-        assert self.node_embedding.dtype == torch.float32
-        self.n_nodes = self.adj_tensor.shape[1]
-        self.n_edge_types = self.adj_tensor.shape[0]
-        self.device = self.adj_tensor.device
-        self.embedding_dim = self.node_embedding.shape[1]
-
-    def to(self, device: torch.device):
-        return GGNNInput(self.adj_tensor.to(device), self.node_embedding.to(device), self.n_prop_steps)
-
-
-@dataclass
-class GGNNOutput:
-    """
-        node_embedding (prop_step, node, node_embedding_dim) Tensor
-    """
-    node_embedding: Tensor
-    n_nodes: int = field(init=False)
-    device: torch.device = field(init=False)
-    embedding_dim: int = field(init=False)
-
-    def __post_init__(self):
-        assert self.node_embedding.ndim == 2
-        self.n_nodes = self.node_embedding.shape[0]
-        self.embedding_dim = self.node_embedding.shape[1]
-        self.device = self.node_embedding.device
-
-    def to(self, device: torch.device):
-        return GGNNOutput(self.node_embedding.to(device))
+from models.common import one_pad
 
 
 class GGNN(nn.Module):
-    def __init__(self, hidden_dim: int, n_edge_types: int, bias: bool = True,
+    def __init__(self, dim: int, n_edge_types: int, bias: bool = True,
                  backward_edges: bool = True):
-        assert hidden_dim > 0
+        assert dim > 0
         assert n_edge_types > 0
 
         super(GGNN, self).__init__()
-        self.hidden_dim = hidden_dim
+        self.dim = dim
         self.n_edge_types = n_edge_types
         self.bias = bias
         self.backward_edges = backward_edges
 
-        self.gru = nn.GRUCell(hidden_dim, hidden_dim)
-        std = 1 / math.sqrt(hidden_dim)
-        edge_tensor_size = (n_edge_types + backward_edges * n_edge_types, hidden_dim + bias, hidden_dim)
+        self.gru = nn.GRUCell(dim, dim)
+        std = 1 / math.sqrt(dim)
+        edge_tensor_size = (n_edge_types + backward_edges * n_edge_types, dim + bias, dim)
         self.edge_tensor = nn.Parameter(
             torch.normal(mean=0, std=std, size=edge_tensor_size)
         )
 
-    def _check_inputs(self, inputs: GGNNInput) -> None:
-        assert inputs.n_edge_types == self.n_edge_types
-        assert self.hidden_dim == inputs.embedding_dim
-
-    def _check_outputs(self, inputs: GGNNInput, outputs: GGNNOutput) -> None:
-        assert outputs.n_nodes == inputs.n_nodes
-        assert outputs.embedding_dim == inputs.embedding_dim == self.hidden_dim
-
-    def forward(self, inputs: GGNNInput) -> GGNNOutput:
-        self._check_inputs(inputs)
+    def forward(self, adj_tensor: Tensor, node_embedding: Tensor,
+                n_prop_steps: int) -> Tensor:
+        n_edge_types, n_nodes, _ = adj_tensor.shape
 
         if self.backward_edges:
-            adj_tensor = torch.cat([inputs.adj_tensor, inputs.adj_tensor.transpose(1, 2)])
+            adj_tensor = torch.cat([adj_tensor, adj_tensor.transpose(1, 2)])
         else:
-            adj_tensor = inputs.adj_tensor.transpose(1, 2)
+            adj_tensor = adj_tensor.transpose(1, 2)
 
-        node_embedding = inputs.node_embedding
-
-        for i in range(inputs.n_prop_steps):
+        for i in range(n_prop_steps):
+            activation = node_embedding
             # pad with ones to add bias with matmul
             if self.bias:
-                one_pad = torch.ones(inputs.n_nodes, 1, device=inputs.device)
-                activation = torch.cat([node_embedding, one_pad], dim=1)
-            else:
-                activation = node_embedding
-            assert activation.shape == (inputs.n_nodes, self.hidden_dim + self.bias)
+                activation = one_pad(activation, 1)
+
+            assert activation.shape == (n_nodes, self.dim + self.bias)
 
             activation = torch.matmul(adj_tensor, activation)
-            assert activation.shape == (self.n_edge_types, inputs.n_nodes, self.hidden_dim + self.bias)
+            assert activation.shape == (self.n_edge_types, n_nodes, self.dim + self.bias)
 
             activation = torch.matmul(activation, self.edge_tensor)
-            assert activation.shape == (self.n_edge_types, inputs.n_nodes, self.hidden_dim)
+            assert activation.shape == (self.n_edge_types, n_nodes, self.dim)
 
             activation = torch.sum(activation, dim=0)
-            assert activation.shape == (inputs.n_nodes, self.hidden_dim)
+            assert activation.shape == (n_nodes, self.dim)
 
             node_embedding = self.gru(activation, node_embedding)
 
-        outputs = GGNNOutput(node_embedding)
-        self._check_outputs(inputs, outputs)
-        return outputs
+        return node_embedding
