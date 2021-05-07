@@ -306,7 +306,7 @@ class SimpleSeq2Seq(nn.Module):
         assert len(source_lens) == batch_size
 
         encoder_out, encoder_hidden = self.encoder(source_tokens, source_lens)
-        # assert encoder_out.shape == (seq_len, batch_size, self.embedding_dim)
+        # assert encoder_out.shape == (seq_len, batch_size, self.node_embedding_dim)
         assert encoder_hidden.shape == (self.n_gru_layers, batch_size, self.hidden_dim)
 
         decoded = torch.full(size=(batch_size, max_target_seq_len), fill_value=self.pad_index,

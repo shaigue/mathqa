@@ -68,7 +68,7 @@ class EdgeSelectionModel(nn.Module):
         """
         :return: logits for the probability for attaching each node to the target node
         """
-        # run GraphNodeEmbedding on the graph to get node embedding
+        # run NodeEmbedding on the graph to get node embedding
         node_embedding = self.node_embedding_layer(adj_tensor, node_labels)
         # separate the node to be connected and all the other nodes
         n_nodes = node_embedding.shape[0]

@@ -5,13 +5,14 @@ from dataclasses import dataclass, field
 import torch
 from torch import nn
 from torch import Tensor
+# TODO: test
 
 
 @dataclass
 class GGNNInput:
     """
         adj_tensor: (edge_type, node, node) sparse tensor
-        node_embedding: (node, embedding_dim) tensor
+        node_embedding: (node, node_embedding_dim) tensor
     """
     adj_tensor: Tensor
     node_embedding: Tensor
@@ -27,6 +28,8 @@ class GGNNInput:
         assert self.adj_tensor.shape[1] == self.adj_tensor.shape[2] == self.node_embedding.shape[0]
         assert self.adj_tensor.device == self.node_embedding.device
         assert self.n_prop_steps >= 0
+        assert self.adj_tensor.dtype == torch.float32
+        assert self.node_embedding.dtype == torch.float32
         self.n_nodes = self.adj_tensor.shape[1]
         self.n_edge_types = self.adj_tensor.shape[0]
         self.device = self.adj_tensor.device
@@ -39,7 +42,7 @@ class GGNNInput:
 @dataclass
 class GGNNOutput:
     """
-        node_embedding (prop_step, node, embedding_dim) Tensor
+        node_embedding (prop_step, node, node_embedding_dim) Tensor
     """
     node_embedding: Tensor
     n_nodes: int = field(init=False)
@@ -57,7 +60,8 @@ class GGNNOutput:
 
 
 class GGNN(nn.Module):
-    def __init__(self, hidden_dim: int, n_edge_types: int, bias: bool = True):
+    def __init__(self, hidden_dim: int, n_edge_types: int, bias: bool = True,
+                 backward_edges: bool = True):
         assert hidden_dim > 0
         assert n_edge_types > 0
 
@@ -65,11 +69,13 @@ class GGNN(nn.Module):
         self.hidden_dim = hidden_dim
         self.n_edge_types = n_edge_types
         self.bias = bias
+        self.backward_edges = backward_edges
 
         self.gru = nn.GRUCell(hidden_dim, hidden_dim)
         std = 1 / math.sqrt(hidden_dim)
+        edge_tensor_size = (n_edge_types + backward_edges * n_edge_types, hidden_dim + bias, hidden_dim)
         self.edge_tensor = nn.Parameter(
-            torch.normal(mean=0, std=std, size=(n_edge_types, hidden_dim + bias, hidden_dim))
+            torch.normal(mean=0, std=std, size=edge_tensor_size)
         )
 
     def _check_inputs(self, inputs: GGNNInput) -> None:
@@ -83,7 +89,11 @@ class GGNN(nn.Module):
     def forward(self, inputs: GGNNInput) -> GGNNOutput:
         self._check_inputs(inputs)
 
-        adj_transpose = inputs.adj_tensor.transpose(1, 2)
+        if self.backward_edges:
+            adj_tensor = torch.cat([inputs.adj_tensor, inputs.adj_tensor.transpose(1, 2)])
+        else:
+            adj_tensor = inputs.adj_tensor.transpose(1, 2)
+
         node_embedding = inputs.node_embedding
 
         for i in range(inputs.n_prop_steps):
@@ -95,7 +105,7 @@ class GGNN(nn.Module):
                 activation = node_embedding
             assert activation.shape == (inputs.n_nodes, self.hidden_dim + self.bias)
 
-            activation = torch.matmul(adj_transpose, activation)
+            activation = torch.matmul(adj_tensor, activation)
             assert activation.shape == (self.n_edge_types, inputs.n_nodes, self.hidden_dim + self.bias)
 
             activation = torch.matmul(activation, self.edge_tensor)
