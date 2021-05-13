@@ -1,12 +1,13 @@
 import networkx as nx
 
-from program_graph.parse_linear_formula import ParsedLinearFormula, ArgType, Arg
+from program_processing.parse_linear_formula import ParsedLinearFormula, Arg
+from program_processing.common import ArgType
 from math_qa.math_qa import get_constants_descriptors
 
 
-def parsed_linear_formula_to_nx_graph(parsed_lf: ParsedLinearFormula, n_inputs: int) -> nx.MultiDiGraph:
+def parsed_to_nx(parsed_lf: ParsedLinearFormula, n_inputs: int) -> nx.MultiDiGraph:
     """Creates a Graph where the Nodes are Arg, and have the 'label' property
-    label is const_name, n{i} for inputs, and op type in operation node."""
+    label is const_name, n{i} for inputs, and op type in op node."""
     # create the graph
     graph = nx.MultiDiGraph()
 
@@ -22,7 +23,7 @@ def parsed_linear_formula_to_nx_graph(parsed_lf: ParsedLinearFormula, n_inputs: 
 
     # add the op nodes
     for op_i in range(len(parsed_lf)):
-        node = Arg(ArgType.temp, key=op_i)
+        node = Arg(ArgType.op, key=op_i)
         op_name = parsed_lf.op_list[op_i]
         graph.add_node(node, label=op_name)
 

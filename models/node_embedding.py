@@ -1,8 +1,7 @@
+import torch
 from torch import nn, Tensor
 
 from models.gated_gnn import GGNN
-
-# TODO: test
 
 
 class NodeEmbedding(nn.Module):

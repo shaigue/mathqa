@@ -99,7 +99,7 @@ def teacher_forcing_loss(target_token_indices, predicted_target_token_logits, pa
     target_token_indices = target_token_indices[1:]
     # drop the last predicted
     predicted_target_token_logits = predicted_target_token_logits[:-1]
-    # swap the axis so that the probabilities over the vocabulary will be in dim=1
+    # swap the axis so that the probabilities over the vocabulary will be in key_dim=1
     predicted_target_token_logits = torch.transpose(predicted_target_token_logits, 2, 1)
     # output.shape = (N, C, ...), target.shape = (N, ...)
     return F.cross_entropy(predicted_target_token_logits, target_token_indices, ignore_index=pad_index)

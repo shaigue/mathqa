@@ -128,15 +128,15 @@ class Program:
         for op_index, op_and_args in enumerate(linear_formula_split):
             # remove the trailing ')'
             op_and_args = op_and_args.replace(')', '')
-            # split the operation name and the arguments
+            # split the op name and the arguments
             op, args = op_and_args.split('(')
-            # add the operation node
+            # add the op node
             op_node = OperationNode(op_index, op)
             program.graph.add_node(op_node)
             args = args.split(',')
             for arg_index, arg in enumerate(args):
                 arg_node = None
-                # output from previous operation node
+                # output from previous op node
                 if arg.startswith('#'):
                     index = int(arg[1:])
                     arg_node = program._get_op_node(index)
@@ -325,7 +325,7 @@ class Program:
         return refactored_program
 
     def sub_program(self, node_subset: frozenset[OperationNode], return_original_to_input_map=False):
-        """Assumes that the node subset is only operation nodes.
+        """Assumes that the node subset is only op nodes.
 
         :param node_subset: the subset of nodes to take.
         :param return_original_to_input_map: if to return the mapping from the input nodes in the olf graph to
@@ -363,7 +363,7 @@ class Program:
         for node in self.graph.nodes:
             if isinstance(node, OperationNode) and node.identifier == index:
                 return node
-        assert False, f"Could not find operation node {index}"
+        assert False, f"Could not find op node {index}"
 
     def _iter_operators_nodes(self) -> Iterator[OperationNode]:
         for node in self.graph.nodes:
@@ -374,14 +374,14 @@ class Program:
         """Returns the graph for isomorphic matching"""
         
         eq_graph = nx.MultiDiGraph()
-        # copy all the nodes, add the operation names as attributes
+        # copy all the nodes, add the op names as attributes
         for node in self.graph.nodes:
             attr = {}
             if isinstance(node, OperationNode):
                 attr['op_name'] = node.operation_name
             eq_graph.add_node(node, **attr)
         for input_node, output_node, arg_index in self.graph.edges:
-            assert isinstance(output_node, OperationNode), "only operation nodes should have inputs"
+            assert isinstance(output_node, OperationNode), "only op nodes should have inputs"
             attr = {}
             # if it is not commutative then give meaning to the ordering
             if not output_node.is_commutative():
@@ -392,12 +392,12 @@ class Program:
 
     def _get_eq_subgraph(self):
         """This should be done on the smaller graph where matching sub-graphs.
-        This is because input nodes might be swapped with other operation nodes. so they need
+        This is because input nodes might be swapped with other op nodes. so they need
         to get special attention when matched.
         """
 
         eq_subgraph = nx.MultiDiGraph()
-        # copy all the nodes, add the operation names as attributes
+        # copy all the nodes, add the op names as attributes
         for node in self.graph.nodes:
             attr = {'input': False}
             if isinstance(node, OperationNode):
@@ -406,7 +406,7 @@ class Program:
                 attr['input'] = True
             eq_subgraph.add_node(node, **attr)
         for input_node, output_node, arg_index in self.graph.edges:
-            assert isinstance(output_node, OperationNode), "only operation nodes should have inputs"
+            assert isinstance(output_node, OperationNode), "only op nodes should have inputs"
             attr = {}
             # if it is not commutative then give meaning to the ordering
             if not output_node.is_commutative():
@@ -444,7 +444,7 @@ class Program:
 
     @staticmethod
     def _match_programs(program1, program2):
-        """try to match program1 and program2, by finding an isomorphism operation preserving, and edge order preserving on
+        """try to match program1 and program2, by finding an isomorphism op preserving, and edge order preserving on
         non-commutative op_list.
         :returns a matching (mapping from program1 nodes to program2 nodes) if exists one, else returns None.
         """
@@ -473,7 +473,7 @@ class Program:
         return list(matcher.subgraph_isomorphisms_iter())
 
     def _get_op_inputs(self, node: OperationNode) -> list[Node]:
-        """return an ordered list of the nodes that the operation depends on"""
+        """return an ordered list of the nodes that the op depends on"""
         op_inputs = []
         for pred_node, edges in self.graph.pred[node].items():
             for arg_num in edges:
@@ -497,7 +497,7 @@ class Program:
         return node_subset.issubset(all_ops)
 
     def _get_fresh_op_identifier(self):
-        """Returns an unused operation id"""
+        """Returns an unused op id"""
         used_operation_indices = {op_node.identifier for op_node in self._iter_operators_nodes()}
         for i in count():
             if i not in used_operation_indices:

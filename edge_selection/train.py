@@ -6,7 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from edge_selection.data_utils import ArgSelectionDataset
 from edge_selection.model import EdgeSelectionModel
-from program_graph.utils import get_max_n_args, get_n_node_labels
+from program_processing.common import get_max_n_args, get_n_node_labels
 
 
 def check_correct(logits: Tensor, gt: int) -> int:

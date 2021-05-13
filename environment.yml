@@ -1,0 +1,15 @@
+name: mathqa-torch
+channels:
+  - defaults
+dependencies:
+  - cudatoolkit
+  - pytorch
+  - torchtext
+  - scikit-learn
+  - hdbscan
+  - matplotlib
+  - pandas
+  - networkx
+  - tensorboard
+  - ignite
+prefix: C:\Users\shaigue\Miniconda3\envs\mathqa-torch

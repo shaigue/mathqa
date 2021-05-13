@@ -1,12 +1,7 @@
 from dataclasses import dataclass
-from enum import Enum, auto
 from typing import Union
 
-
-class ArgType(Enum):
-    const = auto()
-    input = auto()
-    temp = auto()
+from program_processing.common import ArgType
 
 
 @dataclass(frozen=True)
@@ -22,7 +17,7 @@ class Arg:
 
         elif s.startswith('#'):
             key = int(s[1:])
-            t = ArgType.temp
+            t = ArgType.op
 
         elif s.startswith('const'):
             key = s
@@ -35,7 +30,7 @@ class Arg:
     def __str__(self) -> str:
         if self.arg_type == ArgType.const:
             return self.key
-        if self.arg_type == ArgType.temp:
+        if self.arg_type == ArgType.op:
             return f"#{self.key}"
         if self.arg_type == ArgType.input:
             return f"n{self.key}"
@@ -45,6 +40,9 @@ class Arg:
 class ParsedLinearFormula:
     op_list: list[str]
     arg_list_list: list[list[Arg]]
+
+    def __post_init__(self):
+        assert len(self.op_list) == len(self.arg_list_list)
 
     def __len__(self) -> int:
         return len(self.op_list)

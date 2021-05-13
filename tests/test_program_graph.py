@@ -3,8 +3,9 @@
 import unittest
 
 import config
-from program_graph.convert_to_nx_graph import parsed_linear_formula_to_nx_graph
-from program_graph.parse_linear_formula import ParsedLinearFormula, ArgType, Arg, parse_linear_formula
+from program_processing.parsed_to_nx import parsed_to_nx
+from program_processing.parse_linear_formula import ParsedLinearFormula, Arg, parse_linear_formula
+from program_processing.common import ArgType
 from macro_extraction.program import Program, OperationNode
 import math_qa.math_qa as mathqa
 
@@ -217,8 +218,8 @@ class MyTestCase(unittest.TestCase):
             op_list=['add', 'multiply', 'divide'],
             arg_list_list=[
                 [Arg(ArgType.input, 0), Arg(ArgType.input, 0)],
-                [Arg(ArgType.temp, 0), Arg(ArgType.const, 'const_1')],
-                [Arg(ArgType.temp, 1), Arg(ArgType.temp, 0)]
+                [Arg(ArgType.op, 0), Arg(ArgType.const, 'const_1')],
+                [Arg(ArgType.op, 1), Arg(ArgType.op, 0)]
             ]
         )
         result = parse_linear_formula(lf)
@@ -228,7 +229,7 @@ class MyTestCase(unittest.TestCase):
         lf = 'add(n0,n0)|multiply(#0,const_1)|divide(#1,#0)|'
         # TODO: not a test
         result = parse_linear_formula(lf)
-        result = parsed_linear_formula_to_nx_graph(result, 2)
+        result = parsed_to_nx(result, 2)
         print(result)
 
 if __name__ == '__main__':
