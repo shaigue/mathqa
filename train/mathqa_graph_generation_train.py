@@ -1,5 +1,4 @@
 """train the graph generation model for mathqa"""
-import shutil
 from dataclasses import dataclass
 from typing import Union
 import uuid
@@ -80,7 +79,8 @@ class Accuracy:
 
 def train():
     # TODO: enable loading model from file
-    dummy = True
+    # dummy = True
+    dummy = False
     exp_name = 'graph_generator'
     exp_dir = config.get_exp_dir_path(exp_name)
     unique_id = uuid.uuid1()
@@ -96,11 +96,11 @@ def train():
 
     n_node_labels = get_n_node_labels()
     n_edge_types = get_max_n_args()
-    node_embedding_dim = 64
+    node_embedding_dim = 128
     condition_dim = config.TEXT_VECTOR_DIM
     node_label_to_edge_types = get_node_label_to_edge_types()
     node_labels_to_generate = get_op_label_indices()
-    n_prop_steps = 2
+    n_prop_steps = 3
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = GraphGenerator(
@@ -240,7 +240,7 @@ def train():
     )
     dev_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {'model': model})
 
-    trainer.run(train_loader, max_epochs=100)
+    trainer.run(train_loader, max_epochs=400)
 
 
 if __name__ == "__main__":
