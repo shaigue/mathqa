@@ -92,6 +92,7 @@ def train():
     train_loader = get_dataloader('train', dummy=dummy)
     val_loader = get_dataloader('dev', dummy=dummy)
 
+    print('data collection finished', flush=True)
     eval_every = 5
 
     n_node_labels = get_n_node_labels()
